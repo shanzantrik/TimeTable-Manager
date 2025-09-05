@@ -1,0 +1,39 @@
+[build]
+  command = "./netlify-build.sh"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Disable Prisma caching to prevent build issues
+[build.processing]
+  skip_processing = false
+
+# Clear Prisma cache before build
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Disable dependency caching for Prisma
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+# Ensure Prisma client is regenerated on each build
+[build.processing.skip_processing]
+  paths = ["node_modules/.prisma"]
+
+# Build settings
+[build.processing.html]
+  pretty_urls = true
+
+# Disable caching for Prisma-related files
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
