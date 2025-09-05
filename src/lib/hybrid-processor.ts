@@ -1,8 +1,10 @@
 // Removed unused imports
 import OpenAI from 'openai'
 
-// Dynamic import for Tesseract to handle serverless environments better
-let Tesseract: typeof import('tesseract.js') | null = null
+// Tesseract.js configuration for universal compatibility
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let Tesseract: any = null
+let isTesseractLoaded = false
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -78,9 +80,40 @@ export class HybridTimetableProcessor {
           return this.getFallbackData()
         }
       } else {
-        // Step 1: OCR with Tesseract for images
-        const ocrResult = await this.performOCR(filePath)
-        console.log(`📖 OCR extracted ${ocrResult.text.length} characters with ${ocrResult.confidence}% confidence`)
+        // Step 1: Try OCR with Tesseract for images
+        let ocrResult: OCRResult
+        try {
+          ocrResult = await this.performOCR(filePath)
+          console.log(`📖 OCR extracted ${ocrResult.text.length} characters with ${ocrResult.confidence}% confidence`)
+        } catch (ocrError) {
+          console.error('❌ Tesseract OCR failed completely:', ocrError)
+          console.log('🔄 Falling back to direct LLM processing...')
+
+          // If OCR fails completely, try direct LLM processing
+          try {
+            const directPrompt = `Extract timetable information from this image file: ${filePath}. Look for time blocks, activities, and schedule information.`
+            const timetableData = await this.extractTimetableWithLLM(directPrompt)
+            console.log(`🤖 Direct LLM extracted ${timetableData.timeblocks.length} timeblocks`)
+            return timetableData
+          } catch (directError) {
+            console.error('Direct LLM processing failed:', directError)
+            return this.getFallbackData()
+          }
+        }
+
+        // If OCR fails completely, try direct LLM processing
+        if (ocrResult.text.length === 0) {
+          console.log('⚠️ OCR returned empty text, trying direct LLM processing...')
+          try {
+            const directPrompt = `Extract timetable information from this image file: ${filePath}. Look for time blocks, activities, and schedule information.`
+            const timetableData = await this.extractTimetableWithLLM(directPrompt)
+            console.log(`🤖 Direct LLM extracted ${timetableData.timeblocks.length} timeblocks`)
+            return timetableData
+          } catch (directError) {
+            console.error('Direct LLM processing failed:', directError)
+            return this.getFallbackData()
+          }
+        }
 
         // Step 2: Structure the OCR data for LLM
         const structuredData = this.structureOCRData(ocrResult)
@@ -90,11 +123,106 @@ export class HybridTimetableProcessor {
         const timetableData = await this.extractTimetableWithLLM(structuredData)
         console.log(`🤖 LLM extracted ${timetableData.timeblocks.length} timeblocks`)
 
+        // Cleanup Tesseract resources
+        await this.cleanupTesseract()
+
         return timetableData
       }
     } catch (error) {
       console.error('❌ Hybrid processing error:', error)
+      // Cleanup Tesseract resources even on error
+      await this.cleanupTesseract()
       return this.getFallbackData()
+    }
+  }
+
+  /**
+   * Initialize Tesseract with universal compatibility
+   */
+  private async initializeTesseract(): Promise<void> {
+    console.log('🔧 Initializing Tesseract for universal compatibility...')
+
+    try {
+      // Check if we're in a serverless environment
+      const isServerless = process.env.NETLIFY || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+      console.log('🌐 Environment detected:', isServerless ? 'Serverless' : 'Local')
+
+      // Try different initialization strategies based on environment
+      const strategies = [
+        // Strategy 1: Direct import (works in most environments)
+        async () => {
+          const tesseractModule = await import('tesseract.js')
+          Tesseract = tesseractModule.default || tesseractModule
+          console.log('✅ Tesseract loaded via direct import')
+        },
+
+        // Strategy 2: Serverless-optimized configuration
+        async () => {
+          const tesseractModule = await import('tesseract.js')
+
+          if (isServerless) {
+            // For serverless environments, use a simpler approach without workers
+            Tesseract = tesseractModule.default || tesseractModule
+            console.log('✅ Tesseract loaded for serverless environment')
+          } else {
+            // For local environments, try worker configuration
+            const { createWorker } = tesseractModule
+            if (createWorker) {
+              const worker = await createWorker('eng', 1, {
+                logger: (m: Record<string, unknown>) => {
+                  if (m.status === 'recognizing text') {
+                    const progress = typeof m.progress === 'number' ? m.progress : 0
+                    console.log(`Worker Progress: ${Math.round(progress * 100)}%`)
+                  }
+                }
+              })
+              Tesseract = worker
+              console.log('✅ Tesseract loaded via worker configuration')
+            } else {
+              Tesseract = tesseractModule.default || tesseractModule
+              console.log('✅ Tesseract loaded via fallback')
+            }
+          }
+        },
+
+        // Strategy 2.5: Netlify-specific configuration
+        async () => {
+          const tesseractModule = await import('tesseract.js')
+
+          if (process.env.NETLIFY) {
+            // Special handling for Netlify
+            Tesseract = tesseractModule.default || tesseractModule
+            console.log('✅ Tesseract loaded for Netlify environment')
+          } else {
+            throw new Error('Not Netlify environment')
+          }
+        },
+
+        // Strategy 3: Minimal configuration fallback
+        async () => {
+          const tesseractModule = await import('tesseract.js')
+          Tesseract = tesseractModule.default || tesseractModule
+          console.log('✅ Tesseract loaded via minimal fallback')
+        }
+      ]
+
+      // Try each strategy until one succeeds
+      for (let i = 0; i < strategies.length; i++) {
+        try {
+          await strategies[i]()
+          isTesseractLoaded = true
+          console.log(`✅ Tesseract initialization successful with strategy ${i + 1}`)
+          return
+        } catch (error) {
+          console.log(`⚠️ Strategy ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error')
+          if (i === strategies.length - 1) {
+            throw error // Re-throw if all strategies fail
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ All Tesseract initialization strategies failed:', error)
+      throw new Error('Failed to initialize Tesseract.js')
     }
   }
 
@@ -105,13 +233,23 @@ export class HybridTimetableProcessor {
     console.log('🔍 Running Tesseract OCR...')
 
     try {
-      // Dynamic import for better serverless compatibility
+      // Initialize Tesseract with universal compatibility
+      if (!isTesseractLoaded) {
+        try {
+          await this.initializeTesseract()
+        } catch (initError) {
+          console.error('❌ Tesseract initialization failed:', initError)
+          throw new Error('Tesseract initialization failed')
+        }
+      }
+
       if (!Tesseract) {
-        Tesseract = (await import('tesseract.js')).default
+        throw new Error('Tesseract not initialized')
       }
 
       const { data } = await Tesseract.recognize(filePath, 'eng', {
-        logger: (m) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        logger: (m: any) => {
           if (m.status === 'recognizing text') {
             console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
           }
@@ -139,6 +277,14 @@ export class HybridTimetableProcessor {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       })
+
+      // Try to cleanup Tesseract resources on error
+      try {
+        await this.cleanupTesseract()
+      } catch (cleanupError) {
+        console.log('⚠️ Error during cleanup:', cleanupError)
+      }
+
       // Return empty result if OCR fails
       return {
         text: '',
@@ -911,6 +1057,20 @@ ${text}`
     }
 
     return colors[Math.abs(hash) % colors.length]
+  }
+
+  /**
+   * Cleanup Tesseract resources
+   */
+  private async cleanupTesseract(): Promise<void> {
+    if (Tesseract && typeof Tesseract.terminate === 'function') {
+      try {
+        await Tesseract.terminate()
+        console.log('🧹 Tesseract worker terminated')
+      } catch (error) {
+        console.log('⚠️ Error terminating Tesseract worker:', error)
+      }
+    }
   }
 
   /**
