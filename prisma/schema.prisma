@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  timetables Timetable[]
+
+  @@map("teachers")
+}
+
+model Timetable {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  teacherId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  timeblocks TimeBlock[]
+
+  @@map("timetables")
+}
+
+model TimeBlock {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startTime   String   // Store as string for flexibility (e.g., "09:00", "9:00 AM")
+  endTime     String   // Store as string for flexibility
+  dayOfWeek   String   // "Monday", "Tuesday", etc.
+  duration    Int?     // Duration in minutes (optional)
+  color       String?  // Hex color for UI display
+  timetableId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  timetable Timetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+
+  @@map("timeblocks")
+}
+
+model UploadedFile {
+  id          String   @id @default(cuid())
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int
+  path        String
+  processed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("uploaded_files")
+}

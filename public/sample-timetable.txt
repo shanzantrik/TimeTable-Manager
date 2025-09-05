@@ -1,0 +1,36 @@
+Sample Timetable for Testing
+
+MONDAY
+9:00 AM - 10:00 AM: Mathematics
+10:15 AM - 11:15 AM: English Literature
+11:30 AM - 12:30 PM: Science Lab
+1:30 PM - 2:30 PM: History
+2:45 PM - 3:45 PM: Physical Education
+
+TUESDAY
+9:00 AM - 10:00 AM: English Literature
+10:15 AM - 11:15 AM: Mathematics
+11:30 AM - 12:30 PM: Art Class
+1:30 PM - 2:30 PM: Geography
+2:45 PM - 3:45 PM: Music
+
+WEDNESDAY
+9:00 AM - 10:00 AM: Science
+10:15 AM - 11:15 AM: Mathematics
+11:30 AM - 12:30 PM: Computer Science
+1:30 PM - 2:30 PM: English Literature
+2:45 PM - 3:45 PM: Library Time
+
+THURSDAY
+9:00 AM - 10:00 AM: Mathematics
+10:15 AM - 11:15 AM: Science Lab
+11:30 AM - 12:30 PM: English Literature
+1:30 PM - 2:30 PM: Social Studies
+2:45 PM - 3:45 PM: Drama
+
+FRIDAY
+9:00 AM - 10:00 AM: English Literature
+10:15 AM - 11:15 AM: Mathematics
+11:30 AM - 12:30 PM: Science
+1:30 PM - 2:30 PM: Physical Education
+2:45 PM - 3:45 PM: Free Time
