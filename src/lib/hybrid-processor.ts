@@ -1,6 +1,8 @@
 // Removed unused imports
-import Tesseract from 'tesseract.js'
 import OpenAI from 'openai'
+
+// Dynamic import for Tesseract to handle serverless environments better
+let Tesseract: typeof import('tesseract.js') | null = null
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -102,28 +104,47 @@ export class HybridTimetableProcessor {
   private async performOCR(filePath: string): Promise<OCRResult> {
     console.log('🔍 Running Tesseract OCR...')
 
-    const { data } = await Tesseract.recognize(filePath, 'eng', {
-      logger: (m) => {
-        if (m.status === 'recognizing text') {
-          console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
-        }
-      },
-      // Enhanced OCR settings for better text recognition
-      // Note: Some advanced Tesseract options may not be available in this version
-      // Try different page segmentation modes for better table recognition
-    })
+    try {
+      // Dynamic import for better serverless compatibility
+      if (!Tesseract) {
+        Tesseract = (await import('tesseract.js')).default
+      }
 
-    return {
-      text: data.text || '',
-      confidence: data.confidence || 0,
-      words: ((data as unknown as { words?: unknown[] }).words || []).map((word: unknown) => {
-        const wordObj = word as Record<string, unknown>
-        return {
-          text: (wordObj.text as string) || '',
-          confidence: (wordObj.confidence as number) || 0,
-          bbox: (wordObj.bbox as { x0: number; y0: number; x1: number; y1: number }) || { x0: 0, y0: 0, x1: 0, y1: 0 }
-        }
+      const { data } = await Tesseract.recognize(filePath, 'eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
+          }
+        },
+        // Enhanced OCR settings for better text recognition
+        // Note: Some advanced Tesseract options may not be available in this version
+        // Try different page segmentation modes for better table recognition
       })
+
+      return {
+        text: data.text || '',
+        confidence: data.confidence || 0,
+        words: ((data as unknown as { words?: unknown[] }).words || []).map((word: unknown) => {
+          const wordObj = word as Record<string, unknown>
+          return {
+            text: (wordObj.text as string) || '',
+            confidence: (wordObj.confidence as number) || 0,
+            bbox: (wordObj.bbox as { x0: number; y0: number; x1: number; y1: number }) || { x0: 0, y0: 0, x1: 0, y1: 0 }
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Tesseract OCR failed:', error)
+      console.error('OCR Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      // Return empty result if OCR fails
+      return {
+        text: '',
+        confidence: 0,
+        words: []
+      }
     }
   }
 
