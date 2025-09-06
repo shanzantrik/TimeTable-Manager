@@ -1054,6 +1054,14 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
                   </p>
                 </div>
 
+                {/* Debug Info - Raw JSON Data */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="text-lg font-semibold text-gray-900 mb-2">Raw Data (Debug)</h5>
+                  <pre className="text-xs text-gray-600 bg-white p-3 rounded border overflow-x-auto">
+                    {JSON.stringify(viewingTimeblock, null, 2)}
+                  </pre>
+                </div>
+
                 {/* Action Buttons */}
                 <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
                   <button

@@ -60,6 +60,7 @@ interface ParsedTimeblock {
   color?: string
   blocks?: ParsedTimeblock[]
   schedule?: ParsedTimeblock[]
+  activities?: ParsedTimeblock[]
 }
 
 interface ParsedResponse {
@@ -597,6 +598,7 @@ ${text}`
     let parsed: ParsedResponse
     try {
       parsed = JSON.parse(jsonContent) as ParsedResponse
+      console.log('✅ Successfully parsed JSON:', JSON.stringify(parsed, null, 2))
     } catch (error) {
       console.error('❌ JSON parsing error:', error)
       console.log('🔍 Raw response that failed to parse:', jsonContent)
@@ -626,9 +628,9 @@ ${text}`
         endTime = end.trim()
       }
 
-      // Handle nested blocks structure (from Claude) - both 'blocks' and 'schedule' arrays
-      if ((block.blocks && Array.isArray(block.blocks)) || (block.schedule && Array.isArray(block.schedule))) {
-        const nestedArray = (block.blocks || block.schedule) as ParsedTimeblock[]
+      // Handle nested blocks structure (from Claude) - 'blocks', 'schedule', or 'activities' arrays
+      if ((block.blocks && Array.isArray(block.blocks)) || (block.schedule && Array.isArray(block.schedule)) || (block.activities && Array.isArray(block.activities))) {
+        const nestedArray = (block.blocks || block.schedule || block.activities) as ParsedTimeblock[]
         // Flatten the nested structure - return array of TimeBlocks
         return nestedArray.map((nestedBlock: ParsedTimeblock, nestedIndex: number): TimeBlock => {
           const nestedTitle = nestedBlock.subject || nestedBlock.title || nestedBlock.activity || `Activity ${index + 1}.${nestedIndex + 1}`
@@ -671,6 +673,8 @@ ${text}`
     // Enhance with RAG data
     const enhancedTimeblocks = this.getEnhancedTimeblocks(allTimeblocks)
 
+    console.log(`✅ Successfully processed ${enhancedTimeblocks.length} timeblocks`)
+    console.log('🎯 Final processed timeblocks:', JSON.stringify(enhancedTimeblocks, null, 2))
     return {
       timeblocks: enhancedTimeblocks
     }
