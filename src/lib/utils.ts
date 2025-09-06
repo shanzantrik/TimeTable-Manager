@@ -6,8 +6,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatTime(time: string): string {
+  // Handle undefined/null values
+  if (!time || typeof time !== 'string') {
+    return '00:00 AM'
+  }
+
   // Convert 24-hour format to 12-hour format for display
   const [hours, minutes] = time.split(':').map(Number)
+
+  // Handle invalid time format
+  if (isNaN(hours) || isNaN(minutes)) {
+    return '00:00 AM'
+  }
+
   const period = hours >= 12 ? 'PM' : 'AM'
   const displayHours = hours % 12 || 12
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`

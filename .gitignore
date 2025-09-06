@@ -20,6 +20,7 @@
 /uploads/
 # production
 /build
+timetable-471308-d89c02a7b534.json*
 timetable-471308-f0c781e2f36b.json*
 # misc
 .DS_Store

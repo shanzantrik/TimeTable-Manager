@@ -117,9 +117,11 @@ export default function FileUpload({ onTimetableCreated }: FileUploadProps) {
       setProcessing(true)
       setCurrentStep('Processing file with AI...')
 
-      addLog('Starting AI processing...')
+      addLog('Starting hybrid AI processing...')
       if (uploadedFile.type.includes('image/')) {
-        addLog('Using OpenAI Vision to analyze image...')
+        addLog('Using Tesseract OCR to extract text from image...')
+      } else if (uploadedFile.type.includes('pdf')) {
+        addLog('Using RAG system to process PDF directly...')
       } else {
         addLog('Extracting text from document...')
       }
@@ -147,8 +149,8 @@ export default function FileUpload({ onTimetableCreated }: FileUploadProps) {
         throw new Error(processData.error || 'Processing failed')
       }
 
-      addLog('✅ AI processing completed!')
-      addLog(`Extracted ${processData.timetable.timeblocks.length} activities`)
+      addLog('✅ Hybrid AI processing completed!')
+      addLog(`Extracted ${processData.timetable.timeblocks.length} activities using Claude & Gemini`)
       addLog('Generating timetable display...')
 
       setCurrentStep('Creating timetable...')

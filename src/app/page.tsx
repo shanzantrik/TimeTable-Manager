@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Upload, Calendar, Clock, Users, FileText, Sparkles, Database } from 'lucide-react'
+import { Upload, Calendar, Clock, Users, FileText, Sparkles, Database, Brain } from 'lucide-react'
 import FileUpload from '@/components/FileUpload'
 import TimetableGrid from '@/components/TimetableGrid'
 import TimetableList from '@/components/TimetableList'
@@ -148,125 +148,96 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Animated Workflow System */}
-        <div className="mb-16">
-          <div className="text-center mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Hybrid AI Processing Workflow</h3>
-            <p className="text-gray-600">Advanced OCR + Multi-LLM Intelligence for Perfect Extraction</p>
+        {/* Compact 7-Box Workflow System */}
+        <div className="mb-12">
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Hybrid AI Processing Workflow</h3>
+            <p className="text-gray-600 text-sm">Complete pipeline from upload to interactive display</p>
           </div>
 
-          <div className="relative">
-            {/* Workflow Steps */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
-              {/* Step 1: Upload */}
-              <div className="workflow-step group">
-                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-blue-200 hover:border-blue-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-4 mx-auto animate-bounce">
-                    <Upload className="w-8 h-8 text-white" />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-2 text-center">Upload Document</h4>
-                  <p className="text-sm text-gray-600 text-center">Images, PDFs, Word docs</p>
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+            {/* Step 1: Upload */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-blue-200 hover:border-blue-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-bounce">
+                  <Upload className="w-5 h-5 text-white" />
                 </div>
-              </div>
-
-              {/* Arrow 1 */}
-              <div className="hidden md:flex justify-center">
-                <div className="arrow-right animate-pulse">
-                  <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Step 2: OCR Processing */}
-              <div className="workflow-step group">
-                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-purple-200 hover:border-purple-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-4 mx-auto animate-pulse">
-                    <FileText className="w-8 h-8 text-white" />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-2 text-center">Tesseract OCR</h4>
-                  <p className="text-sm text-gray-600 text-center">Text extraction & analysis</p>
-                </div>
-              </div>
-
-              {/* Arrow 2 */}
-              <div className="hidden md:flex justify-center">
-                <div className="arrow-right animate-pulse" style={{ animationDelay: '0.5s' }}>
-                  <svg className="w-8 h-8 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Step 3: Multi-LLM Processing */}
-              <div className="workflow-step group">
-                <div className="bg-white rounded-2xl p-6 shadow-lg border-2 border-green-200 hover:border-green-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center mb-4 mx-auto animate-spin">
-                    <Sparkles className="w-8 h-8 text-white" />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-2 text-center">AI Intelligence</h4>
-                  <p className="text-sm text-gray-600 text-center">OpenAI • Claude • Gemini</p>
-                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">Upload</h4>
+                <p className="text-xs text-gray-600 text-center">Images, PDFs</p>
               </div>
             </div>
 
-            {/* Processing Details Row */}
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* LLM Providers */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                <h5 className="text-lg font-semibold text-gray-900 mb-4 text-center">Multi-LLM Processing</h5>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3 animate-pulse">
-                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">O</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">OpenAI GPT-4o-mini</span>
-                  </div>
-                  <div className="flex items-center space-x-3 animate-pulse" style={{ animationDelay: '0.2s' }}>
-                    <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">C</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">Claude 3.5 Sonnet</span>
-                  </div>
-                  <div className="flex items-center space-x-3 animate-pulse" style={{ animationDelay: '0.4s' }}>
-                    <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">G</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">Gemini 1.5 Flash</span>
-                  </div>
+            {/* Step 2: Tesseract OCR */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-purple-200 hover:border-purple-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-pulse">
+                  <FileText className="w-5 h-5 text-white" />
                 </div>
-              </div>
-
-              {/* Database Storage */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
-                <h5 className="text-lg font-semibold text-gray-900 mb-4 text-center">Database Storage</h5>
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 mx-auto animate-bounce">
-                    <Database className="w-8 h-8 text-white" />
-                  </div>
-                  <p className="text-sm text-gray-700 font-medium">SQLite Database</p>
-                  <p className="text-xs text-gray-600 mt-1">Structured data storage</p>
-                </div>
-              </div>
-
-              {/* Final Display */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                <h5 className="text-lg font-semibold text-gray-900 mb-4 text-center">Beautiful Display</h5>
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mb-4 mx-auto animate-pulse">
-                    <Clock className="w-8 h-8 text-white" />
-                  </div>
-                  <p className="text-sm text-gray-700 font-medium">Interactive Timetable</p>
-                  <p className="text-xs text-gray-600 mt-1">Real-time editing & management</p>
-                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">Tesseract OCR</h4>
+                <p className="text-xs text-gray-600 text-center">Text extraction</p>
               </div>
             </div>
 
-            {/* Workflow Flow Indicator */}
-            <div className="mt-8 flex justify-center">
-              <div className="processing-flow rounded-full px-8 py-4 text-white font-bold text-lg shadow-lg">
-                🔄 Continuous Processing Pipeline
+            {/* Step 3: RAG System */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-orange-200 hover:border-orange-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-pulse">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">RAG System</h4>
+                <p className="text-xs text-gray-600 text-center">PDF processing</p>
               </div>
+            </div>
+
+            {/* Step 4: AI Intelligence */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-green-200 hover:border-green-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-spin">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">AI Intelligence</h4>
+                <p className="text-xs text-gray-600 text-center">Claude • Gemini</p>
+              </div>
+            </div>
+
+            {/* Step 5: Database Storage */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-indigo-200 hover:border-indigo-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-bounce">
+                  <Database className="w-5 h-5 text-white" />
+                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">Database</h4>
+                <p className="text-xs text-gray-600 text-center">SQLite storage</p>
+              </div>
+            </div>
+
+            {/* Step 6: Beautiful Display */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-emerald-200 hover:border-emerald-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-pulse">
+                  <Clock className="w-5 h-5 text-white" />
+                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">Display</h4>
+                <p className="text-xs text-gray-600 text-center">Interactive UI</p>
+              </div>
+            </div>
+
+            {/* Step 7: Management */}
+            <div className="workflow-step group">
+              <div className="bg-white rounded-xl p-3 shadow-lg border-2 border-rose-200 hover:border-rose-400 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-rose-600 rounded-lg flex items-center justify-center mb-2 mx-auto animate-pulse">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+                <h4 className="text-xs font-bold text-gray-900 mb-1 text-center">Management</h4>
+                <p className="text-xs text-gray-600 text-center">Edit & manage</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Workflow Flow Indicator */}
+          <div className="mt-6 flex justify-center">
+            <div className="processing-flow rounded-full px-6 py-3 text-white font-bold text-sm shadow-lg">
+              🔄 Complete Processing Pipeline
             </div>
           </div>
         </div>
