@@ -20,7 +20,7 @@
 /uploads/
 # production
 /build
-
+timetable-471308-f0c781e2f36b.json*
 # misc
 .DS_Store
 *.pem
