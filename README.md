@@ -1,64 +1,129 @@
 # Timetable Manager - AI-Powered Schedule Extraction
 
-A modern Next.js application that allows teachers to upload their timetable documents and automatically extract, organize, and display their schedules using AI technology.
+**Developed by Shantanu Goswami**
 
-## Features
+A cutting-edge Next.js application that revolutionizes timetable management through hybrid AI processing, combining Tesseract OCR, RAG (Retrieval-Augmented Generation), and multi-LLM intelligence to extract, organize, and display schedules with unprecedented accuracy.
+
+## 🌟 Features
 
 - 📁 **Multi-format Support**: Upload images, PDFs, and Word documents
-- 🤖 **AI-Powered Extraction**: Uses OpenAI GPT-4 to intelligently extract timetable data
-- 🎨 **Beautiful UI**: Modern, responsive design with Tailwind CSS
-- 📊 **Visual Timetable Grid**: Interactive weekly schedule display
+- 🤖 **Hybrid AI Processing**: Tesseract OCR + RAG + Multi-LLM Intelligence
+- 🧠 **Smart Extraction**: Claude 3.5 Sonnet & Google Gemini for accurate data extraction
+- 🔍 **Keyword-Based Selective Search**: RAG system for intelligent PDF processing
+- 🎨 **Beautiful UI**: Modern, responsive design with dark/light mode support
+- 📊 **Interactive Timetable Grid**: Drag-and-drop weekly schedule display
 - 🔄 **Real-time Processing**: Instant file upload and processing
 - 💾 **Data Persistence**: SQLite database with Prisma ORM
-- 📱 **Responsive Design**: Works on desktop, tablet, and mobile devices
+- 📱 **Super Responsive**: Optimized for all devices from mobile to desktop
+- 🌙 **Dark Mode**: Toggle between light and dark themes
 
-## Tech Stack
+## 🏗️ Architecture Overview
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes, Prisma ORM
-- **Database**: SQLite
-- **AI/ML**: OpenAI GPT-4, OpenAI Vision API
-- **File Processing**: pdf-parse, mammoth, sharp
-- **UI Components**: Lucide React, Radix UI
+### Hybrid AI Processing Pipeline
 
-## Getting Started
+The application employs a sophisticated multi-stage processing pipeline that adapts based on file type:
+
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
+│   Upload    │───▶│ Tesseract OCR│───▶│ RAG System  │───▶│ AI Intelligence│
+│  (Images)   │    │  (Images)    │    │   (PDFs)    │    │ Claude+Gemini │
+└─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
+                                                              │
+                                                              ▼
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
+│  Database   │◀───│   Display    │◀───│ Management  │◀───│  Structured  │
+│  Storage    │    │ Interactive  │    │   Tools     │    │    Data      │
+└─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
+```
+
+### Core Components
+
+#### 1. **File Processing Engine**
+
+- **Tesseract OCR**: Extracts text from images with high accuracy
+- **RAG System**: Direct PDF processing using keyword-based selective search
+- **Text Extraction**: Handles multiple file formats intelligently
+
+#### 2. **AI Intelligence Layer**
+
+- **Claude 3.5 Sonnet**: Primary LLM for complex timetable extraction
+- **Google Gemini 1.5 Flash**: Secondary LLM for enhanced accuracy
+- **Multi-Provider Fallback**: Ensures processing reliability
+
+#### 3. **RAG (Retrieval-Augmented Generation) System**
+
+- **Knowledge Base**: Pre-trained on educational timetable patterns
+- **Keyword Extraction**: Identifies subjects, activities, and time patterns
+- **Semantic Search**: Matches extracted text with relevant timetable structures
+- **Context Enhancement**: Provides additional context for better extraction
+
+#### 4. **Data Processing Pipeline**
+
+- **JSON Parsing**: Robust handling of varied LLM response formats
+- **Data Validation**: Ensures extracted data meets quality standards
+- **Structure Normalization**: Converts different formats to unified structure
+- **Error Handling**: Graceful fallbacks for processing failures
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript for type safety
+- **Styling**: Tailwind CSS with responsive design
+- **UI Components**: Lucide React icons
+- **State Management**: React hooks (useState, useEffect)
+- **Drag & Drop**: @dnd-kit for interactive timetable editing
+
+### Backend
+
+- **API**: Next.js API Routes
+- **Database**: SQLite with Prisma ORM
+- **File Processing**: pdf-parse, Tesseract.js
+- **AI Integration**: Anthropic Claude, Google Gemini
+
+### AI/ML Stack
+
+- **OCR**: Tesseract.js for image text extraction
+- **LLMs**: Claude 3.5 Sonnet, Google Gemini 1.5 Flash
+- **RAG**: Custom keyword-based selective search system
+- **Processing**: Hybrid approach combining OCR and direct text extraction
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
 - npm or yarn
-- OpenAI API key
+- AI API keys (Claude and/or Google Gemini)
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository:**
 
 ```bash
 git clone <repository-url>
 cd timetable-manager
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 
 ```bash
 npm install
 ```
 
-3. Set up environment variables:
+3. **Set up environment variables:**
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and add your OpenAI API key:
+Edit `.env` and add your API keys:
 
 ```env
 DATABASE_URL="file:./dev.db"
 
 # AI Provider API Keys (at least one required)
-OPENAI_API_KEY="your-openai-api-key-here"
-
-# Alternative providers (optional - will fallback if OpenAI fails)
 ANTHROPIC_API_KEY="your-anthropic-api-key-here"
 GOOGLE_API_KEY="your-google-api-key-here"
 
@@ -68,26 +133,25 @@ NEXTAUTH_SECRET="your-secret-key-here"
 
 **⚠️ Important:** You need at least one valid AI API key for extraction to work. The system will try providers in this order:
 
-1. **OpenAI** (primary) - Get from [OpenAI Platform](https://platform.openai.com/api-keys)
-2. **Anthropic Claude** (fallback) - Get from [Anthropic Console](https://console.anthropic.com/)
-3. **Google Gemini** (fallback) - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
+1. **Anthropic Claude** (primary) - Get from [Anthropic Console](https://console.anthropic.com/)
+2. **Google Gemini** (fallback) - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-4. Set up the database:
+3. **Set up the database:**
 
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-5. Start the development server:
+5. **Start the development server:**
 
 ```bash
 npm run dev
 ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+6. **Open [http://localhost:3000](http://localhost:3000) in your browser.**
 
-## Usage
+## 📖 Usage Guide
 
 ### Uploading a Timetable
 
@@ -98,9 +162,9 @@ npm run dev
 
 ### Supported File Types
 
-- **Images**: JPEG, PNG, JPG
-- **Documents**: PDF, DOCX
-- **Formats**: Scanned images, typed documents, handwritten notes
+- **Images**: JPEG, PNG, JPG (processed with Tesseract OCR)
+- **PDFs**: Direct processing with RAG system
+- **Documents**: DOCX (converted to text for AI processing)
 
 ### Timetable Display
 
@@ -110,8 +174,10 @@ The extracted timetable is displayed as an interactive grid showing:
 - **Time Slots**: Hourly time slots from 6 AM to 6 PM
 - **Activities**: Color-coded blocks for each activity
 - **Details**: Start/end times, descriptions, and durations
+- **Drag & Drop**: Reorder activities by dragging blocks
+- **Responsive Design**: Optimized for all screen sizes
 
-## API Endpoints
+## 🔧 API Endpoints
 
 ### File Upload
 
@@ -147,7 +213,24 @@ GET /api/timetables/[id]
 Response: { success: boolean, timetable: Timetable }
 ```
 
-## Database Schema
+### Update Timeblock
+
+```
+PUT /api/timeblocks/[id]
+Content-Type: application/json
+
+Body: { title, description, startTime, endTime, dayOfWeek, duration, color }
+Response: { success: boolean, timeblock: TimeBlock }
+```
+
+### Delete Timeblock
+
+```
+DELETE /api/timeblocks/[id]
+Response: { success: boolean }
+```
+
+## 🗄️ Database Schema
 
 ### Teachers
 
@@ -176,25 +259,70 @@ Response: { success: boolean, timetable: Timetable }
 - `color`: Hex color code for display
 - `timetableId`: Reference to timetable
 
-## AI Processing Pipeline
+## 🧠 AI Processing Pipeline
 
-1. **File Upload**: File is saved to disk and metadata stored in database
-2. **Text Extraction**:
-   - PDFs: Uses pdf-parse
-   - Images: Uses OpenAI Vision API
-   - Word docs: Uses mammoth
-3. **AI Analysis**: Multi-provider LLM system tries providers in order:
-   - **OpenAI GPT-4** (primary)
-   - **Anthropic Claude** (fallback)
-   - **Google Gemini** (fallback)
-4. **Data Storage**: Processed data is saved to database
-5. **UI Display**: Timetable is rendered in interactive grid
+### 1. File Upload & Type Detection
 
-## Customization
+- File is saved to disk and metadata stored in database
+- MIME type detection determines processing path
+
+### 2. Text Extraction (Adaptive)
+
+- **Images**: Tesseract OCR extracts text with high accuracy
+- **PDFs**: RAG system processes directly using keyword-based search
+- **Word docs**: Text extraction for AI processing
+
+### 3. RAG System (PDF Processing)
+
+- **Knowledge Base**: Pre-trained on educational timetable patterns
+- **Keyword Extraction**: Identifies subjects, activities, time patterns
+- **Semantic Search**: Matches extracted text with relevant structures
+- **Context Enhancement**: Provides additional context for better extraction
+
+### 4. AI Analysis (Multi-Provider)
+
+- **Claude 3.5 Sonnet**: Primary LLM for complex extraction
+- **Google Gemini 1.5 Flash**: Secondary LLM for enhanced accuracy
+- **Fallback System**: Ensures processing reliability
+
+### 5. Data Processing & Validation
+
+- **JSON Parsing**: Robust handling of varied LLM response formats
+- **Structure Normalization**: Converts different formats to unified structure
+- **Quality Validation**: Ensures extracted data meets standards
+
+### 6. Storage & Display
+
+- Processed data is saved to database
+- Timetable is rendered in interactive grid
+- Real-time editing and management capabilities
+
+## 🎨 UI/UX Features
+
+### Responsive Design
+
+- **Mobile First**: Optimized for small screens
+- **Progressive Enhancement**: Better experience on larger screens
+- **Flexible Layouts**: Content adapts smoothly across all device sizes
+
+### Dark/Light Mode
+
+- **Toggle Button**: Easy switching between themes
+- **Smooth Transitions**: Animated theme changes
+- **Consistent Styling**: All components support both modes
+
+### Interactive Elements
+
+- **Drag & Drop**: Reorder timetable activities
+- **Real-time Editing**: Edit activities directly in the grid
+- **Visual Feedback**: Hover effects and animations
+- **Touch-Friendly**: Optimized for mobile interactions
+
+## 🔧 Customization
 
 ### Adding New File Types
 
-Extend the `processTimetableFile` function in `src/lib/timetable-processor.ts`:
+Extend the processing logic in `src/lib/hybrid-processor.ts`:
 
 ```typescript
 // Add new file type handling
@@ -218,9 +346,15 @@ const prompt = `
 
 The app uses Tailwind CSS with custom design tokens. Modify `tailwind.config.js` and `src/app/globals.css` for custom styling.
 
-## Deployment
+## 🚀 Deployment
 
-### Vercel (Recommended)
+### Railway (Recommended)
+
+1. Connect your GitHub repository to Railway
+2. Add environment variables in Railway dashboard
+3. Deploy automatically on push
+
+### Vercel
 
 1. Push your code to GitHub
 2. Connect your repository to Vercel
@@ -233,7 +367,7 @@ The app uses Tailwind CSS with custom design tokens. Modify `tailwind.config.js`
 2. Start production server: `npm start`
 3. Set up your database and environment variables
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
@@ -241,14 +375,24 @@ The app uses Tailwind CSS with custom design tokens. Modify `tailwind.config.js`
 4. Push to branch: `git push origin feature-name`
 5. Submit a pull request
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
+## 🆘 Support
 
-For support, email support@timetablemanager.com or create an issue in the repository.
+For support, email shaanjyot13@gmail.com or create an issue in the repository.
+
+## 🙏 Acknowledgments
+
+- **Tesseract.js** for OCR capabilities
+- **Anthropic** for Claude AI
+- **Google** for Gemini AI
+- **Next.js** team for the amazing framework
+- **Tailwind CSS** for the utility-first CSS framework
 
 ---
 
-Built with ❤️ using Next.js, OpenAI, and modern web technologies.
+**Built with ❤️ by Shantanu Goswami**
+
+_Revolutionizing timetable management through hybrid AI processing and modern web technologies._
