@@ -18,10 +18,17 @@ export function getDayOrder(day: string): number {
   return days.indexOf(day)
 }
 
-export function sortTimeblocksByDayAndTime(timeblocks: any[]) {
-  return timeblocks.sort((a, b) => {
-    const dayComparison = getDayOrder(a.dayOfWeek) - getDayOrder(b.dayOfWeek)
+interface TimeBlock {
+  dayOfWeek: string
+  startTime: string
+}
+
+export function sortTimeblocksByDayAndTime(timeblocks: unknown[]) {
+  return timeblocks.sort((a: unknown, b: unknown) => {
+    const timeBlockA = a as TimeBlock
+    const timeBlockB = b as TimeBlock
+    const dayComparison = getDayOrder(timeBlockA.dayOfWeek) - getDayOrder(timeBlockB.dayOfWeek)
     if (dayComparison !== 0) return dayComparison
-    return a.startTime.localeCompare(b.startTime)
+    return timeBlockA.startTime.localeCompare(timeBlockB.startTime)
   })
 }

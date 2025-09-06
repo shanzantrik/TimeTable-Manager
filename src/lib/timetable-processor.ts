@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import { HybridTimetableProcessor } from './hybrid-processor'
 
 // Dynamic import for pdf-parse to avoid build-time issues
-let pdf: any = null // eslint-disable-line @typescript-eslint/no-explicit-any
+let pdf: { default: (buffer: Buffer) => Promise<{ text: string }> } | null = null
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -174,7 +174,6 @@ export async function processTimetableFile(filePath: string, mimeType: string) {
         // Process PDF with dynamic import
         if (!pdf) {
           console.log('Loading PDF parser...')
-          // @ts-expect-error - pdf-parse doesn't have types
           pdf = await import('pdf-parse')
         }
         const dataBuffer = readFileSync(filePath)

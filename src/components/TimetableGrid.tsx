@@ -216,7 +216,7 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
     color: '#3B82F6'
   })
 
-  const sortedTimeblocks = sortTimeblocksByDayAndTime(timeblocks)
+  const sortedTimeblocks = sortTimeblocksByDayAndTime(timeblocks) as TimeBlock[]
 
   // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
@@ -233,7 +233,7 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
   }
 
   // Filter timeblocks based on search and day filter
-  const filteredTimeblocks = sortedTimeblocks.filter(block => {
+  const filteredTimeblocks = sortedTimeblocks.filter((block: TimeBlock) => {
     const matchesSearch = searchTerm === '' ||
       block.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (block.description && block.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -246,7 +246,7 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
   // Group filtered timeblocks by day
   const timeblocksByDay = DAYS.map(day => ({
     day,
-    blocks: filteredTimeblocks.filter(block => block.dayOfWeek === day)
+    blocks: filteredTimeblocks.filter((block: TimeBlock) => block.dayOfWeek === day)
   }))
 
   const getTimeSlotHeight = (startTime: string, endTime: string) => {
@@ -478,10 +478,10 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
   }
 
   // Enhanced function to determine text color with better contrast
-  const getTextColor = (backgroundColor: string) => {
-    // Always return white for better visibility on colored backgrounds
-    return '#ffffff'
-  }
+  // const getTextColor = (backgroundColor: string) => {
+  //   // Always return white for better visibility on colored backgrounds
+  //   return '#ffffff'
+  // }
 
   // Function to get enhanced background color with better contrast
   const getEnhancedBackgroundColor = (originalColor: string) => {
@@ -685,7 +685,7 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
               <Clock className="w-4 h-4 text-green-600" />
               <span className="font-medium">
                 {Math.round(
-                  filteredTimeblocks.reduce((total, block) => {
+                  filteredTimeblocks.reduce((total: number, block: TimeBlock) => {
                     const start = new Date(`2000-01-01 ${block.startTime}`)
                     const end = new Date(`2000-01-01 ${block.endTime}`)
                     return total + (end.getTime() - start.getTime()) / (1000 * 60)
