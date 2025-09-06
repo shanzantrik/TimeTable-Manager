@@ -3,7 +3,8 @@ import OpenAI from 'openai'
 import { HybridTimetableProcessor } from './hybrid-processor'
 
 // Dynamic import for pdf-parse to avoid build-time issues
-let pdf: { default: (buffer: Buffer) => Promise<{ text: string }> } | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let pdf: any = null
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY

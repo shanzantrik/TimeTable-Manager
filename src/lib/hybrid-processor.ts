@@ -174,7 +174,8 @@ export class HybridTimetableProcessor {
 
     try {
       // Import pdf-parse dynamically
-      let pdfParse: { default: (buffer: Buffer) => Promise<{ text: string }> }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let pdfParse: any
       try {
         pdfParse = await import('pdf-parse')
       } catch {
