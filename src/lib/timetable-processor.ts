@@ -169,45 +169,30 @@ export async function processTimetableFile(filePath: string, mimeType: string) {
     }
 
     if (mimeType === 'application/pdf') {
-      console.log('Processing PDF file with Hybrid OCR + LLM...')
-      // Use hybrid processor for PDFs as well
+      console.log('Processing PDF file...')
       try {
-        const hybridProcessor = HybridTimetableProcessor.getInstance()
-        const result = await hybridProcessor.processImage(filePath)
-        return result
-      } catch (error) {
-        console.error('PDF processing error:', error)
-        // Fallback to basic text extraction
+        // Process PDF with dynamic import
+        if (!pdf) {
+          console.log('Loading PDF parser...')
+          // @ts-expect-error - pdf-parse doesn't have types
+          pdf = await import('pdf-parse')
+        }
+        const dataBuffer = readFileSync(filePath)
+        console.log('Extracting text from PDF...')
+        const pdfData = await pdf.default(dataBuffer)
+        extractedText = pdfData.text
+        console.log(`Extracted ${extractedText.length} characters from PDF`)
+      } catch (pdfError) {
+        console.error('PDF processing error:', pdfError)
+        // Try alternative PDF processing approach
         try {
-          console.log('Trying basic PDF text extraction...')
-          if (!pdf) {
-            console.log('Loading PDF parser...')
-            try {
-              // @ts-expect-error - pdf-parse doesn't have types
-              pdf = await import('pdf-parse')
-            } catch (importError) {
-              console.error('Failed to import pdf-parse:', importError)
-              // Use fallback data if PDF parsing completely fails
-              return {
-                timeblocks: [
-                  { title: "PDF Document", description: "Please manually add timetable entries", startTime: "09:00", endTime: "10:00", dayOfWeek: "Monday", duration: 60, color: "#6B7280" }
-                ]
-              }
-            }
-          }
-          const dataBuffer = readFileSync(filePath)
-          console.log('Extracting text from PDF...')
-          const pdfData = await pdf.default(dataBuffer)
-          extractedText = pdfData.text
-          console.log(`Extracted ${extractedText.length} characters from PDF`)
-        } catch (pdfError) {
-          console.error('PDF processing error:', pdfError)
-          // Final fallback - return a basic timetable structure
-          return {
-            timeblocks: [
-              { title: "PDF Document", description: "Please manually add timetable entries", startTime: "09:00", endTime: "10:00", dayOfWeek: "Monday", duration: 60, color: "#6B7280" }
-            ]
-          }
+          console.log('Trying alternative PDF processing...')
+          // For now, use empty text and let the fallback data handle it
+          extractedText = ''
+          console.log('Using empty text as fallback for PDF processing')
+        } catch (altError) {
+          console.error('Alternative PDF processing also failed:', altError)
+          extractedText = ''
         }
       }
                 } else if (mimeType.includes('image/')) {

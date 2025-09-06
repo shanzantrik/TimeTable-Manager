@@ -1,13 +1,66 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { HybridTimetableProcessor } from '@/lib/hybrid-processor'
 
+// Custom logger that captures console output
+class LogCapture {
+  private logs: string[] = []
+  private originalConsoleLog: typeof console.log
+  private originalConsoleError: typeof console.error
+  private originalConsoleWarn: typeof console.warn
+
+  constructor() {
+    this.originalConsoleLog = console.log
+    this.originalConsoleError = console.error
+    this.originalConsoleWarn = console.warn
+  }
+
+  start() {
+    console.log = (...args: unknown[]) => {
+      const message = args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')
+      this.logs.push(`[${new Date().toISOString()}] ${message}`)
+      this.originalConsoleLog(...args)
+    }
+
+    console.error = (...args: unknown[]) => {
+      const message = args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')
+      this.logs.push(`[${new Date().toISOString()}] ERROR: ${message}`)
+      this.originalConsoleError(...args)
+    }
+
+    console.warn = (...args: unknown[]) => {
+      const message = args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')
+      this.logs.push(`[${new Date().toISOString()}] WARN: ${message}`)
+      this.originalConsoleWarn(...args)
+    }
+  }
+
+  stop() {
+    console.log = this.originalConsoleLog
+    console.error = this.originalConsoleError
+    console.warn = this.originalConsoleWarn
+  }
+
+  getLogs() {
+    return this.logs
+  }
+
+  clear() {
+    this.logs = []
+  }
+}
+
 export async function POST(request: NextRequest) {
+  const logCapture = new LogCapture()
+
   try {
     const { fileId, teacherId, title, description } = await request.json()
 
     if (!fileId) {
-      return NextResponse.json({ error: 'File ID is required' }, { status: 400 })
+      return new Response(JSON.stringify({ error: 'File ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     // Get the uploaded file
@@ -16,12 +69,21 @@ export async function POST(request: NextRequest) {
     })
 
     if (!uploadedFile) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 })
+      return new Response(JSON.stringify({ error: 'File not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     if (uploadedFile.processed) {
-      return NextResponse.json({ error: 'File already processed' }, { status: 400 })
+      return new Response(JSON.stringify({ error: 'File already processed' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
+
+    // Start capturing logs
+    logCapture.start()
 
     // Process the file to extract timetable data using hybrid processor
     const processor = HybridTimetableProcessor.getInstance()
@@ -86,7 +148,10 @@ export async function POST(request: NextRequest) {
       data: { processed: true }
     })
 
-    return NextResponse.json({
+    // Stop capturing logs
+    logCapture.stop()
+
+    return new Response(JSON.stringify({
       success: true,
       timetable: {
         id: timetable.id,
@@ -94,14 +159,22 @@ export async function POST(request: NextRequest) {
         description: timetable.description,
         timeblocks
       },
+      logs: logCapture.getLogs(),
       message: 'Timetable processed successfully'
+    }), {
+      headers: { 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
+    logCapture.stop()
     console.error('Processing error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process timetable' },
-      { status: 500 }
-    )
+
+    return new Response(JSON.stringify({
+      error: 'Failed to process timetable',
+      logs: logCapture.getLogs()
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    })
   }
 }

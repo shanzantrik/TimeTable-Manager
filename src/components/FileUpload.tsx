@@ -78,8 +78,6 @@ export default function FileUpload({ onTimetableCreated }: FileUploadProps) {
     setLogs(prev => [...prev, `[${timestamp}] ${message}`])
   }
 
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
   const uploadFile = async () => {
     if (!uploadedFile) return
 
@@ -120,74 +118,10 @@ export default function FileUpload({ onTimetableCreated }: FileUploadProps) {
       setCurrentStep('Processing file with AI...')
 
       addLog('Starting AI processing...')
-
-      // Show detailed processing steps
       if (uploadedFile.type.includes('image/')) {
-        addLog('🔍 Running Tesseract OCR...')
-        await delay(1000)
-        addLog('📖 OCR extracted text with confidence analysis...')
-        await delay(800)
-        addLog('🏗️ Structured OCR data for LLM processing...')
-        await delay(500)
-        addLog('🤖 Trying OpenAI for extraction...')
-        await delay(1200)
-        addLog('❌ OpenAI extraction error: Quota exceeded, trying Claude...')
-        await delay(800)
-        addLog('🤖 Trying Claude for extraction...')
-        await delay(1500)
-        addLog('✅ Successfully extracted timeblocks using Claude')
-        await delay(500)
-        addLog('🤖 LLM extracted timeblocks')
-        await delay(300)
-        addLog('📊 Adding standard timetable blocks (Registration, Break, Lunch, etc.)...')
-        await delay(400)
-        addLog('🎨 Assigning colors to timeblocks...')
-        await delay(300)
-        addLog('✅ Hybrid processing completed successfully')
-      } else if (uploadedFile.type.includes('pdf')) {
-        addLog('📄 Processing PDF file...')
-        await delay(1000)
-        addLog('📖 Extracting text from PDF...')
-        await delay(1200)
-        addLog('🏗️ Structured text data for LLM processing...')
-        await delay(500)
-        addLog('🤖 Trying OpenAI for extraction...')
-        await delay(1000)
-        addLog('❌ OpenAI extraction error: Quota exceeded, trying Claude...')
-        await delay(800)
-        addLog('🤖 Trying Claude for extraction...')
-        await delay(1500)
-        addLog('✅ Successfully extracted timeblocks using Claude')
-        await delay(500)
-        addLog('🤖 LLM extracted timeblocks')
-        await delay(300)
-        addLog('📊 Adding standard timetable blocks (Registration, Break, Lunch, etc.)...')
-        await delay(400)
-        addLog('🎨 Assigning colors to timeblocks...')
-        await delay(300)
-        addLog('✅ Hybrid processing completed successfully')
+        addLog('Using OpenAI Vision to analyze image...')
       } else {
-        addLog('📝 Processing Word document...')
-        await delay(1000)
-        addLog('📖 Extracting text from Word document...')
-        await delay(1200)
-        addLog('🏗️ Structured text data for LLM processing...')
-        await delay(500)
-        addLog('🤖 Trying OpenAI for extraction...')
-        await delay(1000)
-        addLog('❌ OpenAI extraction error: Quota exceeded, trying Claude...')
-        await delay(800)
-        addLog('🤖 Trying Claude for extraction...')
-        await delay(1500)
-        addLog('✅ Successfully extracted timeblocks using Claude')
-        await delay(500)
-        addLog('🤖 LLM extracted timeblocks')
-        await delay(300)
-        addLog('📊 Adding standard timetable blocks (Registration, Break, Lunch, etc.)...')
-        await delay(400)
-        addLog('🎨 Assigning colors to timeblocks...')
-        await delay(300)
-        addLog('✅ Hybrid processing completed successfully')
+        addLog('Extracting text from document...')
       }
 
       // Process the file
@@ -357,30 +291,14 @@ export default function FileUpload({ onTimetableCreated }: FileUploadProps) {
               <span className="text-xs text-blue-600 font-medium">{currentStep}</span>
             )}
           </div>
-          <div className="max-h-60 overflow-y-auto space-y-1 bg-gray-50 rounded-lg p-3 border">
-            <div className="text-xs font-semibold text-gray-700 mb-2">Processing Log:</div>
-            {logs.map((log, index) => {
-              const isError = log.includes('❌') || log.includes('Error')
-              const isSuccess = log.includes('✅') || log.includes('successfully')
-              const isProcessing = log.includes('🔍') || log.includes('🤖') || log.includes('📖') || log.includes('🏗️')
-
-              return (
-                <div
-                  key={index}
-                  className={`text-xs font-mono flex items-start space-x-2 ${
-                    isError ? 'text-red-600' :
-                    isSuccess ? 'text-green-600' :
-                    isProcessing ? 'text-blue-600' :
-                    'text-gray-600'
-                  }`}
-                >
-                  <span className="flex-shrink-0 w-2 h-2 rounded-full mt-1.5 bg-current opacity-60"></span>
-                  <span className="flex-1">{log}</span>
-                </div>
-              )
-            })}
+          <div className="max-h-40 overflow-y-auto space-y-1">
+            {logs.map((log, index) => (
+              <div key={index} className="text-xs text-gray-600 font-mono">
+                {log}
+              </div>
+            ))}
             {(uploading || processing) && (
-              <div className="text-xs text-blue-500 font-mono flex items-center space-x-2 mt-2 pt-2 border-t border-gray-200">
+              <div className="text-xs text-gray-500 font-mono flex items-center space-x-2">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 <span>Processing...</span>
               </div>

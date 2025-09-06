@@ -30,12 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Create uploads directory if it doesn't exist
     const uploadsDir = join(process.cwd(), 'uploads')
-    try {
-      await mkdir(uploadsDir, { recursive: true })
-    } catch (dirError) {
-      console.error('Failed to create uploads directory:', dirError)
-      // Continue anyway, the directory might already exist
-    }
+    await mkdir(uploadsDir, { recursive: true })
 
     // Generate unique filename
     const timestamp = Date.now()
@@ -69,20 +64,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Upload error:', error)
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined
-    })
-
-    // Check if it's a database connection error
-    if (error instanceof Error && error.message.includes('PrismaClientInitializationError')) {
-      return NextResponse.json(
-        { error: 'Database connection failed. Please check your database configuration.' },
-        { status: 500 }
-      )
-    }
-
     return NextResponse.json(
       { error: 'Failed to upload file' },
       { status: 500 }

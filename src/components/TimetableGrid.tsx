@@ -478,10 +478,10 @@ export default function TimetableGrid({ timetable, onTimetableUpdated }: Timetab
   }
 
   // Enhanced function to determine text color with better contrast
-  // const getTextColor = (backgroundColor: string) => {
-  //   // Always return white for better visibility on colored backgrounds
-  //   return '#ffffff'
-  // }
+  const getTextColor = (backgroundColor: string) => {
+    // Always return white for better visibility on colored backgrounds
+    return '#ffffff'
+  }
 
   // Function to get enhanced background color with better contrast
   const getEnhancedBackgroundColor = (originalColor: string) => {

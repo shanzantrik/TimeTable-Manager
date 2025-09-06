@@ -1,6 +1,5 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { TimeBlock } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -19,7 +18,7 @@ export function getDayOrder(day: string): number {
   return days.indexOf(day)
 }
 
-export function sortTimeblocksByDayAndTime(timeblocks: TimeBlock[]) {
+export function sortTimeblocksByDayAndTime(timeblocks: any[]) {
   return timeblocks.sort((a, b) => {
     const dayComparison = getDayOrder(a.dayOfWeek) - getDayOrder(b.dayOfWeek)
     if (dayComparison !== 0) return dayComparison

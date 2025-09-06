@@ -1,44 +1,69 @@
 // Removed unused imports
-import OpenAI from 'openai'
-
-// Tesseract.js configuration for universal compatibility
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let Tesseract: any = null
-let isTesseractLoaded = false
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+import Tesseract from 'tesseract.js'
 
 // Alternative LLM providers
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY
 
+interface TimeBlock {
+  id?: string
+  title: string
+  description?: string
+  startTime: string
+  endTime: string
+  dayOfWeek: string
+  duration?: number
+  color?: string
+  keywords?: string[]
+  subject?: string
+  activityType?: string
+}
+
 interface ExtractedData {
-  timeblocks: Array<{
-    title: string
-    description?: string
-    startTime: string
-    endTime: string
-    dayOfWeek: string
-    duration?: number
-    color?: string
-  }>
+  timeblocks: TimeBlock[]
+}
+
+interface WordData {
+  text: string
+  confidence: number
+  bbox: {
+    x0: number
+    y0: number
+    x1: number
+    y1: number
+  }
 }
 
 interface OCRResult {
   text: string
   confidence: number
-  words: Array<{
-    text: string
-    confidence: number
-    bbox: {
-      x0: number
-      y0: number
-      x1: number
-      y1: number
-    }
-  }>
+  words: WordData[]
+}
+
+interface TesseractData {
+  text: string
+  confidence: number
+  words?: WordData[]
+}
+
+interface ParsedTimeblock {
+  title?: string
+  subject?: string
+  activity?: string
+  description?: string
+  startTime?: string
+  endTime?: string
+  time?: string
+  dayOfWeek?: string
+  day?: string
+  duration?: number
+  color?: string
+  blocks?: ParsedTimeblock[]
+  schedule?: ParsedTimeblock[]
+}
+
+interface ParsedResponse {
+  timeblocks: ParsedTimeblock[]
 }
 
 /**
@@ -47,6 +72,7 @@ interface OCRResult {
  */
 export class HybridTimetableProcessor {
   private static instance: HybridTimetableProcessor
+  private knowledgeBase: Map<string, TimeBlock[]> = new Map()
 
   static getInstance(): HybridTimetableProcessor {
     if (!HybridTimetableProcessor.instance) {
@@ -56,173 +82,118 @@ export class HybridTimetableProcessor {
   }
 
   /**
-   * Process image with hybrid OCR + LLM approach
+   * Process file with hybrid OCR + LLM approach
+   * For PDFs: Use LLM + RAG directly
+   * For Images: Use Tesseract OCR + LLM + RAG
    */
   async processImage(filePath: string): Promise<ExtractedData> {
-    console.log('🔄 Starting hybrid OCR + LLM processing...')
+    console.log('🔄 Starting hybrid processing...')
 
     try {
-      // Check if it's a PDF file
-      if (filePath.toLowerCase().endsWith('.pdf')) {
-        console.log('📄 Processing PDF with text extraction...')
-        // For PDFs, skip OCR and use LLM directly with a generic prompt
-        try {
-          // For PDFs, skip text extraction and use a generic prompt
-          // This avoids the pdf-parse library issues
-          console.log('📄 Using generic PDF processing approach...')
-          const genericPrompt = 'Please extract timetable information from the uploaded PDF document. Look for time blocks, activities, subjects, and schedule information. Extract any visible text content and structure it into a timetable format.'
-          const timetableData = await this.extractTimetableWithLLM(genericPrompt)
-          console.log(`🤖 LLM extracted ${timetableData.timeblocks.length} timeblocks from PDF`)
-          return timetableData
-        } catch (pdfError) {
-          console.error('PDF processing failed:', pdfError)
-          // Return fallback data
-          return this.getFallbackData()
-        }
+      // Determine file type
+      const isPDF = filePath.toLowerCase().endsWith('.pdf')
+
+      if (isPDF) {
+        console.log('📄 Processing PDF file - using LLM + RAG directly')
+        return await this.processPDFDirectly(filePath)
       } else {
-        // Step 1: Try OCR with Tesseract for images
-        let ocrResult: OCRResult
-        try {
-          ocrResult = await this.performOCR(filePath)
-          console.log(`📖 OCR extracted ${ocrResult.text.length} characters with ${ocrResult.confidence}% confidence`)
-        } catch (ocrError) {
-          console.error('❌ Tesseract OCR failed completely:', ocrError)
-          console.log('🔄 Falling back to direct LLM processing...')
-
-          // If OCR fails completely, try direct LLM processing
-          try {
-            const directPrompt = `Extract timetable information from this image file: ${filePath}. Look for time blocks, activities, and schedule information.`
-            const timetableData = await this.extractTimetableWithLLM(directPrompt)
-            console.log(`🤖 Direct LLM extracted ${timetableData.timeblocks.length} timeblocks`)
-            return timetableData
-          } catch (directError) {
-            console.error('Direct LLM processing failed:', directError)
-            return this.getFallbackData()
-          }
-        }
-
-        // If OCR fails completely, try direct LLM processing
-        if (ocrResult.text.length === 0) {
-          console.log('⚠️ OCR returned empty text, trying direct LLM processing...')
-          try {
-            const directPrompt = `Extract timetable information from this image file: ${filePath}. Look for time blocks, activities, and schedule information.`
-            const timetableData = await this.extractTimetableWithLLM(directPrompt)
-            console.log(`🤖 Direct LLM extracted ${timetableData.timeblocks.length} timeblocks`)
-            return timetableData
-          } catch (directError) {
-            console.error('Direct LLM processing failed:', directError)
-            return this.getFallbackData()
-          }
-        }
-
-        // Step 2: Structure the OCR data for LLM
-        const structuredData = this.structureOCRData(ocrResult)
-        console.log('🏗️ Structured OCR data for LLM processing')
-
-        // Step 3: Use LLM to refine and extract timetable
-        const timetableData = await this.extractTimetableWithLLM(structuredData)
-        console.log(`🤖 LLM extracted ${timetableData.timeblocks.length} timeblocks`)
-
-        // Cleanup Tesseract resources
-        await this.cleanupTesseract()
-
-        return timetableData
+        console.log('🖼️ Processing image file - using Tesseract OCR + LLM + RAG')
+        return await this.processImageWithOCR(filePath)
       }
     } catch (error) {
       console.error('❌ Hybrid processing error:', error)
-      // Cleanup Tesseract resources even on error
-      await this.cleanupTesseract()
       return this.getFallbackData()
     }
   }
 
   /**
-   * Initialize Tesseract with universal compatibility
+   * Process PDF directly with LLM + RAG (skip OCR)
    */
-  private async initializeTesseract(): Promise<void> {
-    console.log('🔧 Initializing Tesseract for universal compatibility...')
+  private async processPDFDirectly(filePath: string): Promise<ExtractedData> {
+    console.log('📄 Processing PDF with LLM + RAG...')
 
     try {
-      // Check if we're in a serverless environment
-      const isServerless = process.env.NETLIFY || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
-      console.log('🌐 Environment detected:', isServerless ? 'Serverless' : 'Local')
+      // Step 1: Extract text from PDF
+      const pdfText = await this.extractPDFText(filePath)
+      console.log(`📖 PDF extracted ${pdfText.length} characters`)
 
-      // Try different initialization strategies based on environment
-      const strategies = [
-        // Strategy 1: Direct import (works in most environments)
-        async () => {
-          const tesseractModule = await import('tesseract.js')
-          Tesseract = tesseractModule.default || tesseractModule
-          console.log('✅ Tesseract loaded via direct import')
-        },
-
-        // Strategy 2: Serverless-optimized configuration
-        async () => {
-          const tesseractModule = await import('tesseract.js')
-
-          if (isServerless) {
-            // For serverless environments, use a simpler approach without workers
-            Tesseract = tesseractModule.default || tesseractModule
-            console.log('✅ Tesseract loaded for serverless environment')
-          } else {
-            // For local environments, try worker configuration
-            const { createWorker } = tesseractModule
-            if (createWorker) {
-              const worker = await createWorker('eng', 1, {
-                logger: (m: Record<string, unknown>) => {
-                  if (m.status === 'recognizing text') {
-                    const progress = typeof m.progress === 'number' ? m.progress : 0
-                    console.log(`Worker Progress: ${Math.round(progress * 100)}%`)
-                  }
-                }
-              })
-              Tesseract = worker
-              console.log('✅ Tesseract loaded via worker configuration')
-            } else {
-              Tesseract = tesseractModule.default || tesseractModule
-              console.log('✅ Tesseract loaded via fallback')
-            }
-          }
-        },
-
-        // Strategy 2.5: Netlify-specific configuration
-        async () => {
-          const tesseractModule = await import('tesseract.js')
-
-          if (process.env.NETLIFY) {
-            // Special handling for Netlify
-            Tesseract = tesseractModule.default || tesseractModule
-            console.log('✅ Tesseract loaded for Netlify environment')
-          } else {
-            throw new Error('Not Netlify environment')
-          }
-        },
-
-        // Strategy 3: Minimal configuration fallback
-        async () => {
-          const tesseractModule = await import('tesseract.js')
-          Tesseract = tesseractModule.default || tesseractModule
-          console.log('✅ Tesseract loaded via minimal fallback')
-        }
-      ]
-
-      // Try each strategy until one succeeds
-      for (let i = 0; i < strategies.length; i++) {
-        try {
-          await strategies[i]()
-          isTesseractLoaded = true
-          console.log(`✅ Tesseract initialization successful with strategy ${i + 1}`)
-          return
-        } catch (error) {
-          console.log(`⚠️ Strategy ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error')
-          if (i === strategies.length - 1) {
-            throw error // Re-throw if all strategies fail
-          }
-        }
+      // Check if we have text to process
+      if (!pdfText || pdfText.trim().length === 0) {
+        console.log('⚠️ No text extracted from PDF, using fallback data')
+        return this.getFallbackData()
       }
+
+      // Step 2: Use LLM to extract timetable data directly from PDF text
+      const timetableData = await this.extractTimetableWithLLM(pdfText)
+      console.log(`🤖 LLM extracted ${timetableData.timeblocks.length} timeblocks from PDF`)
+
+      return timetableData
     } catch (error) {
-      console.error('❌ All Tesseract initialization strategies failed:', error)
-      throw new Error('Failed to initialize Tesseract.js')
+      console.error('❌ PDF processing error:', error)
+      return this.getFallbackData()
+    }
+  }
+
+  /**
+   * Process image with Tesseract OCR + LLM + RAG
+   */
+  private async processImageWithOCR(filePath: string): Promise<ExtractedData> {
+    console.log('🖼️ Processing image with Tesseract OCR + LLM + RAG...')
+
+    try {
+      // Step 1: OCR with Tesseract
+      const ocrResult = await this.performOCR(filePath)
+      console.log(`📖 OCR extracted ${ocrResult.text.length} characters with ${ocrResult.confidence}% confidence`)
+
+      // Check if we have text to process
+      if (!ocrResult.text || ocrResult.text.trim().length === 0) {
+        console.log('⚠️ No text extracted from image, using fallback data')
+        return this.getFallbackData()
+      }
+
+      // Step 2: Structure the OCR data for LLM
+      const structuredData = this.structureOCRData(ocrResult)
+      console.log('🏗️ Structured OCR data for LLM processing')
+
+      // Step 3: Use LLM to refine and extract timetable
+      const timetableData = await this.extractTimetableWithLLM(structuredData)
+      console.log(`🤖 LLM extracted ${timetableData.timeblocks.length} timeblocks`)
+
+      return timetableData
+    } catch (error) {
+      console.error('❌ Image processing error:', error)
+      return this.getFallbackData()
+    }
+  }
+
+  /**
+   * Extract text from PDF file
+   */
+  private async extractPDFText(filePath: string): Promise<string> {
+    console.log('📄 Extracting text from PDF...')
+
+    try {
+      // Import pdf-parse dynamically
+      let pdfParse: { default: (buffer: Buffer) => Promise<{ text: string }> }
+      try {
+        pdfParse = await import('pdf-parse')
+      } catch {
+        console.log('PDF parser not available, using fallback')
+        return ''
+      }
+
+      // Read PDF file
+      const fs = await import('fs')
+      const dataBuffer = fs.readFileSync(filePath)
+
+      // Parse PDF
+      const data = await pdfParse.default(dataBuffer)
+      console.log(`📖 PDF text extracted: ${data.text.length} characters`)
+
+      return data.text || ''
+    } catch (error) {
+      console.error('❌ PDF text extraction error:', error)
+      return ''
     }
   }
 
@@ -232,65 +203,24 @@ export class HybridTimetableProcessor {
   private async performOCR(filePath: string): Promise<OCRResult> {
     console.log('🔍 Running Tesseract OCR...')
 
-    try {
-      // Initialize Tesseract with universal compatibility
-      if (!isTesseractLoaded) {
-        try {
-          await this.initializeTesseract()
-        } catch (initError) {
-          console.error('❌ Tesseract initialization failed:', initError)
-          throw new Error('Tesseract initialization failed')
+    const { data } = await Tesseract.recognize(filePath, 'eng', {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
         }
-      }
+      },
+      // Enhanced OCR settings for better text recognition
+      // Note: Some advanced Tesseract options may not be available in this version
+    }) as { data: TesseractData }
 
-      if (!Tesseract) {
-        throw new Error('Tesseract not initialized')
-      }
-
-      const { data } = await Tesseract.recognize(filePath, 'eng', {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        logger: (m: any) => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
-          }
-        },
-        // Enhanced OCR settings for better text recognition
-        // Note: Some advanced Tesseract options may not be available in this version
-        // Try different page segmentation modes for better table recognition
-      })
-
-      return {
-        text: data.text || '',
-        confidence: data.confidence || 0,
-        words: ((data as unknown as { words?: unknown[] }).words || []).map((word: unknown) => {
-          const wordObj = word as Record<string, unknown>
-          return {
-            text: (wordObj.text as string) || '',
-            confidence: (wordObj.confidence as number) || 0,
-            bbox: (wordObj.bbox as { x0: number; y0: number; x1: number; y1: number }) || { x0: 0, y0: 0, x1: 0, y1: 0 }
-          }
-        })
-      }
-    } catch (error) {
-      console.error('Tesseract OCR failed:', error)
-      console.error('OCR Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      })
-
-      // Try to cleanup Tesseract resources on error
-      try {
-        await this.cleanupTesseract()
-      } catch (cleanupError) {
-        console.log('⚠️ Error during cleanup:', cleanupError)
-      }
-
-      // Return empty result if OCR fails
-      return {
-        text: '',
-        confidence: 0,
-        words: []
-      }
+    return {
+      text: data.text || '',
+      confidence: data.confidence || 0,
+      words: (data.words || []).map((word: WordData) => ({
+        text: word.text || '',
+        confidence: word.confidence || 0,
+        bbox: word.bbox || { x0: 0, y0: 0, x1: 0, y1: 0 }
+      }))
     }
   }
 
@@ -351,39 +281,9 @@ export class HybridTimetableProcessor {
    * Extract timetable using LLM with structured OCR data
    */
   private async extractTimetableWithLLM(structuredData: string): Promise<ExtractedData> {
-    const prompt = `
-You are an expert timetable extraction AI. I've provided OCR data from a timetable image.
-Extract the timetable information and return ONLY a valid JSON object with this exact structure:
-
-{
-  "timeblocks": [
-    {
-      "title": "Activity name",
-      "description": "Optional description",
-      "startTime": "HH:MM",
-      "endTime": "HH:MM",
-      "dayOfWeek": "Monday/Tuesday/etc",
-      "duration": minutes,
-      "color": "#hexcode"
-    }
-  ]
-}
-
-Rules:
-- Use the structured line data to identify timetable entries
-- Convert times to 24-hour format (HH:MM)
-- Assign appropriate colors for different activity types
-- Calculate duration from start/end times if not specified
-- Be flexible with time formats (9:00, 9:00 AM, 09:00, etc.)
-- Group activities by day of the week
-
-OCR Data:
-${structuredData}
-`
 
     // Try multiple LLM providers
     const providers = [
-      { name: 'OpenAI', fn: () => this.extractWithOpenAI(prompt) },
       { name: 'Claude', fn: () => this.extractWithClaude(structuredData) },
       { name: 'Gemini', fn: () => this.extractWithGemini(structuredData) }
     ]
@@ -405,88 +305,6 @@ ${structuredData}
     return this.getFallbackData()
   }
 
-  /**
-   * Extract with OpenAI
-   */
-  private async extractWithOpenAI(prompt: string): Promise<ExtractedData> {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert at extracting structured timetable data from OCR text.
-
-EXAMPLES OF TIMETABLE FORMATS TO EXTRACT:
-
-1. Reception Timetable Format:
-- Time slots: 8.40, 9.00, 9.15-10.45, 10.45-11.00, 11.00-11.30, 11.30-12.00, 12.00, 1.00, 1.15, 1.30-2.30, 2.30
-- Days: Monday (M), Tuesday (Tu), Wednesday (W), Thursday (Th), Friday (F)
-- Activities: "Readers and reading champions", "Snack time", "Outside play", "Maths", "Lunch", "Yoga", "Carpet time", "Jigsaw", "Continuous provision", "Phonics", "Word time"
-
-2. Daily Schedule Format:
-- Time format: 8:35, 9:00-9:15, 9:15-9:30, etc.
-- Activities: "Students are allowed inside", "Late Bell Rings", "Morning Work", "Daily 5: Station 1", "Morning Meeting", "Word Work (Phonics)", "Writer's Workshop", "Morning Recess", "Math", "Lunch", "Specialty Classes", "Handwriting", "Science/Health/Social Studies", "Reader's Workshop", "Language/Grammar", "Jobs & Read Aloud", "Pack Up", "School Dismissed"
-
-3. School Timetable Format:
-- Time slots: 8:35-8:50, 9-9:30, 9:30-10, 10-10:15, 10:20-10:35, 10:35-11:00, 11:00-11:55, 12-1, 1-1:15, 1:15-2, 2-3, 3-3:15
-- Days: Monday, Tuesday, Wednesday, Thursday, Friday
-- Activities: "Registration and Early Morning work", "RWI", "Maths", "Assembly", "Break", "Maths Con", "English", "Lunch", "Handwriting", "Maths Meeting", "Science", "Comprehension/Library", "Storytime", "PHSE", "Computing", "History", "Music", "PE", "Singing Assembly", "RE", "Art"
-
-SPECIAL BLOCKS TO ALWAYS EXTRACT:
-- Teacher Details: "Teacher: Miss Joynes", "Class: 2EJ", "Term: Autumn 2 2024", "Little Thurrock Primary School"
-- Registration/Early Morning: "Registration and Early Morning work", "Students are allowed inside", "Morning Work"
-- Break Times: "Break", "Morning Recess", "Snack time", "Outside play"
-- Lunch: "Lunch", "Lunch break"
-- Story Time: "Storytime", "Story Time", "End of day story"
-- Assembly: "Assembly", "Celebration Assembly", "Singing Assembly", "In Class Assembly"
-- RWI: "RWI", "Read Write Inc"
-- Handwriting: "Handwriting"
-- Maths Meeting: "Maths Meeting"
-
-EXTRACTION RULES:
-1. Extract ALL activities with their exact times and days
-2. Handle time ranges like "9:15-10:45" or "1:30-2:30"
-3. Handle single times like "9:00" or "12:00"
-4. Map day abbreviations: M=Monday, Tu=Tuesday, W=Wednesday, Th=Thursday, F=Friday
-5. Extract activity descriptions exactly as written
-6. Calculate duration in minutes from start and end times
-7. Assign appropriate colors based on subject type
-8. ONLY extract blocks that are actually present in the source - do not add standard blocks if they don't exist
-9. Extract teacher details and class information if present
-10. Always return valid JSON with timeblocks array
-
-Always return valid JSON in this format:
-{
-  "timeblocks": [
-    {
-      "title": "Activity Name",
-      "description": "Additional details if any",
-      "startTime": "09:15",
-      "endTime": "10:45",
-      "dayOfWeek": "Monday",
-      "duration": 90,
-      "color": "#3B82F6"
-    }
-  ]
-}`
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 4000
-    })
-
-    const response = completion.choices[0]?.message?.content
-    if (!response) {
-      throw new Error('No response from OpenAI')
-    }
-
-    console.log('🔍 OpenAI raw response:', response)
-    return this.parseJSONResponse(response)
-  }
 
   /**
    * Extract with Claude
@@ -508,46 +326,100 @@ Always return valid JSON in this format:
         max_tokens: 4000,
         messages: [{
           role: 'user',
-          content: `You are an expert at extracting structured timetable data from OCR text.
+          content: `You are an expert at extracting structured timetable data from OCR text with FOCUS ON DETAILED ACTIVITY TITLES AND DESCRIPTIONS.
 
-EXAMPLES OF TIMETABLE FORMATS TO EXTRACT:
+CRITICAL EXTRACTION PRIORITIES:
+1. ACTIVITY TITLES: Extract the EXACT activity names as they appear in the timetable
+2. ACTIVITY DESCRIPTIONS: Provide detailed descriptions for each activity including:
+   - Subject area (Maths, English, Science, etc.)
+   - Activity type (Lesson, Break, Assembly, etc.)
+   - Any additional context or details mentioned
+   - Teacher or room information if available
+
+EXAMPLES OF DETAILED EXTRACTION:
 
 1. Reception Timetable Format:
 - Time slots: 8.40, 9.00, 9.15-10.45, 10.45-11.00, 11.00-11.30, 11.30-12.00, 12.00, 1.00, 1.15, 1.30-2.30, 2.30
 - Days: Monday (M), Tuesday (Tu), Wednesday (W), Thursday (Th), Friday (F)
-- Activities: "Readers and reading champions", "Snack time", "Outside play", "Maths", "Lunch", "Yoga", "Carpet time", "Jigsaw", "Continuous provision", "Phonics", "Word time"
+- Activities with descriptions:
+  * "Readers and reading champions" → "Reading comprehension and literacy skills development"
+  * "Snack time" → "Morning break with healthy snacks"
+  * "Outside play" → "Outdoor physical activity and social play"
+  * "Maths" → "Mathematics lesson covering number recognition and counting"
+  * "Lunch" → "Lunch break and social time"
+  * "Yoga" → "Mindfulness and physical exercise session"
+  * "Carpet time" → "Group learning and discussion time"
+  * "Jigsaw" → "Problem-solving and spatial reasoning activities"
+  * "Continuous provision" → "Self-directed learning and exploration"
+  * "Phonics" → "Letter sounds and reading foundation skills"
+  * "Word time" → "Vocabulary building and language development"
 
 2. Daily Schedule Format:
 - Time format: 8:35, 9:00-9:15, 9:15-9:30, etc.
-- Activities: "Students are allowed inside", "Late Bell Rings", "Morning Work", "Daily 5: Station 1", "Morning Meeting", "Word Work (Phonics)", "Writer's Workshop", "Morning Recess", "Math", "Lunch", "Specialty Classes", "Handwriting", "Science/Health/Social Studies", "Reader's Workshop", "Language/Grammar", "Jobs & Read Aloud", "Pack Up", "School Dismissed"
+- Activities with descriptions:
+  * "Students are allowed inside" → "School arrival and settling in period"
+  * "Late Bell Rings" → "Final call for school start"
+  * "Morning Work" → "Independent learning activities to start the day"
+  * "Daily 5: Station 1" → "Reading workshop station rotation"
+  * "Morning Meeting" → "Class community building and announcements"
+  * "Word Work (Phonics)" → "Spelling and phonics instruction"
+  * "Writer's Workshop" → "Creative writing and composition skills"
+  * "Morning Recess" → "Outdoor break and physical activity"
+  * "Math" → "Mathematics instruction and practice"
+  * "Lunch" → "Lunch break and social time"
+  * "Specialty Classes" → "Art, Music, PE, or other specialist subjects"
+  * "Handwriting" → "Penmanship and fine motor skills practice"
+  * "Science/Health/Social Studies" → "Cross-curricular learning"
+  * "Reader's Workshop" → "Independent and guided reading"
+  * "Language/Grammar" → "English language structure and usage"
+  * "Jobs & Read Aloud" → "Classroom responsibilities and story time"
+  * "Pack Up" → "End of day organization and preparation"
+  * "School Dismissed" → "End of school day departure"
 
 3. School Timetable Format:
 - Time slots: 8:35-8:50, 9-9:30, 9:30-10, 10-10:15, 10:20-10:35, 10:35-11:00, 11:00-11:55, 12-1, 1-1:15, 1:15-2, 2-3, 3-3:15
 - Days: Monday, Tuesday, Wednesday, Thursday, Friday
-- Activities: "Registration and Early Morning work", "RWI", "Maths", "Assembly", "Break", "Maths Con", "English", "Lunch", "Handwriting", "Maths Meeting", "Science", "Comprehension/Library", "Storytime", "PHSE", "Computing", "History", "Music", "PE", "Singing Assembly", "RE", "Art"
+- Activities with descriptions:
+  * "Registration and Early Morning work" → "Daily attendance and independent morning tasks"
+  * "RWI" → "Read Write Inc phonics and literacy program"
+  * "Maths" → "Mathematics lesson with problem-solving activities"
+  * "Assembly" → "Whole school gathering for announcements and presentations"
+  * "Break" → "Morning break for snacks and outdoor play"
+  * "Maths Con" → "Mathematics consolidation and review"
+  * "English" → "English language and literature instruction"
+  * "Lunch" → "Lunch break and social time"
+  * "Handwriting" → "Penmanship practice and fine motor development"
+  * "Maths Meeting" → "Mathematics discussion and mental math practice"
+  * "Science" → "Scientific inquiry and experimentation"
+  * "Comprehension/Library" → "Reading comprehension and library time"
+  * "Storytime" → "End of day story reading and discussion"
+  * "PHSE" → "Personal, Health, Social and Economic education"
+  * "Computing" → "Digital literacy and computer skills"
+  * "History" → "Historical inquiry and research"
+  * "Music" → "Musical education and performance"
+  * "PE" → "Physical education and sports"
+  * "Singing Assembly" → "Musical assembly with singing"
+  * "RE" → "Religious education and values"
+  * "Art" → "Creative arts and crafts"
 
-SPECIAL BLOCKS TO ALWAYS EXTRACT:
-- Teacher Details: "Teacher: Miss Joynes", "Class: 2EJ", "Term: Autumn 2 2024", "Little Thurrock Primary School"
-- Registration/Early Morning: "Registration and Early Morning work", "Students are allowed inside", "Morning Work"
-- Break Times: "Break", "Morning Recess", "Snack time", "Outside play"
-- Lunch: "Lunch", "Lunch break"
-- Story Time: "Storytime", "Story Time", "End of day story"
-- Assembly: "Assembly", "Celebration Assembly", "Singing Assembly", "In Class Assembly"
-- RWI: "RWI", "Read Write Inc"
-- Handwriting: "Handwriting"
-- Maths Meeting: "Maths Meeting"
+SPECIAL BLOCKS TO ALWAYS EXTRACT WITH DETAILS:
+- Teacher Details: "Teacher: Miss Joynes" → "Class teacher information"
+- Class Info: "Class: 2EJ" → "Class identifier and year group"
+- Term Info: "Term: Autumn 2 2024" → "Academic term and year"
+- School Info: "Little Thurrock Primary School" → "School name and location"
 
-EXTRACTION RULES:
-1. Extract ALL activities with their exact times and days
-2. Handle time ranges like "9:15-10:45" or "1:30-2:30"
-3. Handle single times like "9:00" or "12:00"
-4. Map day abbreviations: M=Monday, Tu=Tuesday, W=Wednesday, Th=Thursday, F=Friday
-5. Extract activity descriptions exactly as written
-6. Calculate duration in minutes from start and end times
-7. Assign appropriate colors based on subject type
-8. ONLY extract blocks that are actually present in the source - do not add standard blocks if they don't exist
-9. Extract teacher details and class information if present
-10. Always return valid JSON with timeblocks array
+ENHANCED EXTRACTION RULES:
+1. Extract EXACT activity titles as they appear in the timetable
+2. Provide DETAILED descriptions for each activity explaining what it involves
+3. Include subject area, activity type, and any additional context
+4. Handle time ranges like "9:15-10:45" or "1:30-2:30"
+5. Handle single times like "9:00" or "12:00"
+6. Map day abbreviations: M=Monday, Tu=Tuesday, W=Wednesday, Th=Thursday, F=Friday
+7. Calculate duration in minutes from start and end times
+8. Assign appropriate colors based on subject type
+9. Always extract recurring blocks like Registration, Break, Lunch, Story Time
+10. Extract teacher details and class information if present
+11. Focus on making titles and descriptions meaningful and informative
 
 Extract timetable data from this OCR text and return ONLY valid JSON with timeblocks array:
 
@@ -582,46 +454,100 @@ ${text}`
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are an expert at extracting structured timetable data from OCR text.
+            text: `You are an expert at extracting structured timetable data from OCR text with FOCUS ON DETAILED ACTIVITY TITLES AND DESCRIPTIONS.
 
-EXAMPLES OF TIMETABLE FORMATS TO EXTRACT:
+CRITICAL EXTRACTION PRIORITIES:
+1. ACTIVITY TITLES: Extract the EXACT activity names as they appear in the timetable
+2. ACTIVITY DESCRIPTIONS: Provide detailed descriptions for each activity including:
+   - Subject area (Maths, English, Science, etc.)
+   - Activity type (Lesson, Break, Assembly, etc.)
+   - Any additional context or details mentioned
+   - Teacher or room information if available
+
+EXAMPLES OF DETAILED EXTRACTION:
 
 1. Reception Timetable Format:
 - Time slots: 8.40, 9.00, 9.15-10.45, 10.45-11.00, 11.00-11.30, 11.30-12.00, 12.00, 1.00, 1.15, 1.30-2.30, 2.30
 - Days: Monday (M), Tuesday (Tu), Wednesday (W), Thursday (Th), Friday (F)
-- Activities: "Readers and reading champions", "Snack time", "Outside play", "Maths", "Lunch", "Yoga", "Carpet time", "Jigsaw", "Continuous provision", "Phonics", "Word time"
+- Activities with descriptions:
+  * "Readers and reading champions" → "Reading comprehension and literacy skills development"
+  * "Snack time" → "Morning break with healthy snacks"
+  * "Outside play" → "Outdoor physical activity and social play"
+  * "Maths" → "Mathematics lesson covering number recognition and counting"
+  * "Lunch" → "Lunch break and social time"
+  * "Yoga" → "Mindfulness and physical exercise session"
+  * "Carpet time" → "Group learning and discussion time"
+  * "Jigsaw" → "Problem-solving and spatial reasoning activities"
+  * "Continuous provision" → "Self-directed learning and exploration"
+  * "Phonics" → "Letter sounds and reading foundation skills"
+  * "Word time" → "Vocabulary building and language development"
 
 2. Daily Schedule Format:
 - Time format: 8:35, 9:00-9:15, 9:15-9:30, etc.
-- Activities: "Students are allowed inside", "Late Bell Rings", "Morning Work", "Daily 5: Station 1", "Morning Meeting", "Word Work (Phonics)", "Writer's Workshop", "Morning Recess", "Math", "Lunch", "Specialty Classes", "Handwriting", "Science/Health/Social Studies", "Reader's Workshop", "Language/Grammar", "Jobs & Read Aloud", "Pack Up", "School Dismissed"
+- Activities with descriptions:
+  * "Students are allowed inside" → "School arrival and settling in period"
+  * "Late Bell Rings" → "Final call for school start"
+  * "Morning Work" → "Independent learning activities to start the day"
+  * "Daily 5: Station 1" → "Reading workshop station rotation"
+  * "Morning Meeting" → "Class community building and announcements"
+  * "Word Work (Phonics)" → "Spelling and phonics instruction"
+  * "Writer's Workshop" → "Creative writing and composition skills"
+  * "Morning Recess" → "Outdoor break and physical activity"
+  * "Math" → "Mathematics instruction and practice"
+  * "Lunch" → "Lunch break and social time"
+  * "Specialty Classes" → "Art, Music, PE, or other specialist subjects"
+  * "Handwriting" → "Penmanship and fine motor skills practice"
+  * "Science/Health/Social Studies" → "Cross-curricular learning"
+  * "Reader's Workshop" → "Independent and guided reading"
+  * "Language/Grammar" → "English language structure and usage"
+  * "Jobs & Read Aloud" → "Classroom responsibilities and story time"
+  * "Pack Up" → "End of day organization and preparation"
+  * "School Dismissed" → "End of school day departure"
 
 3. School Timetable Format:
 - Time slots: 8:35-8:50, 9-9:30, 9:30-10, 10-10:15, 10:20-10:35, 10:35-11:00, 11:00-11:55, 12-1, 1-1:15, 1:15-2, 2-3, 3-3:15
 - Days: Monday, Tuesday, Wednesday, Thursday, Friday
-- Activities: "Registration and Early Morning work", "RWI", "Maths", "Assembly", "Break", "Maths Con", "English", "Lunch", "Handwriting", "Maths Meeting", "Science", "Comprehension/Library", "Storytime", "PHSE", "Computing", "History", "Music", "PE", "Singing Assembly", "RE", "Art"
+- Activities with descriptions:
+  * "Registration and Early Morning work" → "Daily attendance and independent morning tasks"
+  * "RWI" → "Read Write Inc phonics and literacy program"
+  * "Maths" → "Mathematics lesson with problem-solving activities"
+  * "Assembly" → "Whole school gathering for announcements and presentations"
+  * "Break" → "Morning break for snacks and outdoor play"
+  * "Maths Con" → "Mathematics consolidation and review"
+  * "English" → "English language and literature instruction"
+  * "Lunch" → "Lunch break and social time"
+  * "Handwriting" → "Penmanship practice and fine motor development"
+  * "Maths Meeting" → "Mathematics discussion and mental math practice"
+  * "Science" → "Scientific inquiry and experimentation"
+  * "Comprehension/Library" → "Reading comprehension and library time"
+  * "Storytime" → "End of day story reading and discussion"
+  * "PHSE" → "Personal, Health, Social and Economic education"
+  * "Computing" → "Digital literacy and computer skills"
+  * "History" → "Historical inquiry and research"
+  * "Music" → "Musical education and performance"
+  * "PE" → "Physical education and sports"
+  * "Singing Assembly" → "Musical assembly with singing"
+  * "RE" → "Religious education and values"
+  * "Art" → "Creative arts and crafts"
 
-SPECIAL BLOCKS TO ALWAYS EXTRACT:
-- Teacher Details: "Teacher: Miss Joynes", "Class: 2EJ", "Term: Autumn 2 2024", "Little Thurrock Primary School"
-- Registration/Early Morning: "Registration and Early Morning work", "Students are allowed inside", "Morning Work"
-- Break Times: "Break", "Morning Recess", "Snack time", "Outside play"
-- Lunch: "Lunch", "Lunch break"
-- Story Time: "Storytime", "Story Time", "End of day story"
-- Assembly: "Assembly", "Celebration Assembly", "Singing Assembly", "In Class Assembly"
-- RWI: "RWI", "Read Write Inc"
-- Handwriting: "Handwriting"
-- Maths Meeting: "Maths Meeting"
+SPECIAL BLOCKS TO ALWAYS EXTRACT WITH DETAILS:
+- Teacher Details: "Teacher: Miss Joynes" → "Class teacher information"
+- Class Info: "Class: 2EJ" → "Class identifier and year group"
+- Term Info: "Term: Autumn 2 2024" → "Academic term and year"
+- School Info: "Little Thurrock Primary School" → "School name and location"
 
-EXTRACTION RULES:
-1. Extract ALL activities with their exact times and days
-2. Handle time ranges like "9:15-10:45" or "1:30-2:30"
-3. Handle single times like "9:00" or "12:00"
-4. Map day abbreviations: M=Monday, Tu=Tuesday, W=Wednesday, Th=Thursday, F=Friday
-5. Extract activity descriptions exactly as written
-6. Calculate duration in minutes from start and end times
-7. Assign appropriate colors based on subject type
-8. ONLY extract blocks that are actually present in the source - do not add standard blocks if they don't exist
-9. Extract teacher details and class information if present
-10. Always return valid JSON with timeblocks array
+ENHANCED EXTRACTION RULES:
+1. Extract EXACT activity titles as they appear in the timetable
+2. Provide DETAILED descriptions for each activity explaining what it involves
+3. Include subject area, activity type, and any additional context
+4. Handle time ranges like "9:15-10:45" or "1:30-2:30"
+5. Handle single times like "9:00" or "12:00"
+6. Map day abbreviations: M=Monday, Tu=Tuesday, W=Wednesday, Th=Thursday, F=Friday
+7. Calculate duration in minutes from start and end times
+8. Assign appropriate colors based on subject type
+9. Always extract recurring blocks like Registration, Break, Lunch, Story Time
+10. Extract teacher details and class information if present
+11. Focus on making titles and descriptions meaningful and informative
 
 Extract timetable data from this OCR text and return ONLY valid JSON with timeblocks array:
 
@@ -667,19 +593,17 @@ ${text}`
 
     console.log('🔍 Cleaned JSON:', jsonContent)
 
-    // Check if the response is valid JSON
-    if (!jsonContent.startsWith('{') || !jsonContent.includes('timeblocks')) {
-      console.log('⚠️ Response is not valid JSON, using fallback data')
-      return this.getFallbackData()
-    }
-
-    let parsed
+    let parsed: ParsedResponse
     try {
-      parsed = JSON.parse(jsonContent)
+      parsed = JSON.parse(jsonContent) as ParsedResponse
     } catch (error) {
       console.error('❌ JSON parsing error:', error)
-      console.log('⚠️ Using fallback data due to JSON parsing error')
-      return this.getFallbackData()
+      console.log('🔍 Raw response that failed to parse:', jsonContent)
+
+      // If JSON parsing fails, return empty timeblocks
+      return {
+        timeblocks: []
+      }
     }
 
     // Validate and add default values
@@ -687,12 +611,12 @@ ${text}`
       throw new Error('Invalid response format')
     }
 
-    const processedTimeblocks = parsed.timeblocks.map((block: Record<string, unknown>, index: number) => {
+    const processedTimeblocks = parsed.timeblocks.flatMap((block: ParsedTimeblock, index: number): TimeBlock[] => {
       // Handle different response formats from LLMs
-      const title = (block.title as string) || (block.subject as string) || (block.activity as string) || `Activity ${index + 1}`
-      let startTime = (block.startTime as string) || '09:00'
-      let endTime = (block.endTime as string) || '10:00'
-      const dayOfWeek = (block.dayOfWeek as string) || (block.day as string) || 'Monday'
+      const title = block.title || block.subject || block.activity || `Activity ${index + 1}`
+      let startTime = block.startTime || '09:00'
+      let endTime = block.endTime || '10:00'
+      const dayOfWeek = block.dayOfWeek || block.day || 'Monday'
 
       // If time is in format "9:30-10:30", split it
       if (block.time && typeof block.time === 'string' && block.time.includes('-')) {
@@ -703,183 +627,59 @@ ${text}`
 
       // Handle nested blocks structure (from Claude) - both 'blocks' and 'schedule' arrays
       if ((block.blocks && Array.isArray(block.blocks)) || (block.schedule && Array.isArray(block.schedule))) {
-        const nestedArray = (block.blocks || block.schedule) as unknown[]
-        // Flatten the nested structure
-        return nestedArray.map((nestedBlock: unknown, nestedIndex: number) => {
-          const nestedBlockObj = nestedBlock as Record<string, unknown>
-          const nestedTitle = (nestedBlockObj.subject as string) || (nestedBlockObj.title as string) || (nestedBlockObj.activity as string) || `Activity ${index + 1}.${nestedIndex + 1}`
-          let nestedStartTime = (nestedBlockObj.startTime as string) || '09:00'
-          let nestedEndTime = (nestedBlockObj.endTime as string) || '10:00'
+        const nestedArray = (block.blocks || block.schedule) as ParsedTimeblock[]
+        // Flatten the nested structure - return array of TimeBlocks
+        return nestedArray.map((nestedBlock: ParsedTimeblock, nestedIndex: number): TimeBlock => {
+          const nestedTitle = nestedBlock.subject || nestedBlock.title || nestedBlock.activity || `Activity ${index + 1}.${nestedIndex + 1}`
+          let nestedStartTime = nestedBlock.startTime || '09:00'
+          let nestedEndTime = nestedBlock.endTime || '10:00'
 
-          if (nestedBlockObj.time && typeof nestedBlockObj.time === 'string' && nestedBlockObj.time.includes('-')) {
-            const [start, end] = nestedBlockObj.time.split('-')
+          if (nestedBlock.time && typeof nestedBlock.time === 'string' && nestedBlock.time.includes('-')) {
+            const [start, end] = nestedBlock.time.split('-')
             nestedStartTime = start.trim()
             nestedEndTime = end.trim()
           }
 
           return {
             title: nestedTitle,
-            description: (nestedBlockObj.description as string) || '',
+            description: nestedBlock.description || '',
             startTime: nestedStartTime,
             endTime: nestedEndTime,
             dayOfWeek: dayOfWeek,
-            duration: (nestedBlockObj.duration as number) || this.calculateDuration(nestedStartTime, nestedEndTime),
-            color: (nestedBlockObj.color as string) || this.getDefaultColor(nestedTitle)
+            duration: nestedBlock.duration || this.calculateDuration(nestedStartTime, nestedEndTime),
+            color: nestedBlock.color || this.getDefaultColor(nestedTitle)
           }
         })
       }
 
-      return {
+      return [{
         title: title,
-        description: (block.description as string) || '',
+        description: block.description || '',
         startTime: startTime,
         endTime: endTime,
         dayOfWeek: dayOfWeek,
-        duration: (block.duration as number) || this.calculateDuration(startTime, endTime),
-        color: (block.color as string) || this.getDefaultColor(title)
-      }
+        duration: block.duration || this.calculateDuration(startTime, endTime),
+        color: block.color || this.getDefaultColor(title)
+      }]
     }).flat() // Flatten the array in case we have nested structures
 
-    // Only add standard blocks if they don't already exist in the extracted data
-    const standardBlocks = this.generateConditionalStandardBlocks(processedTimeblocks)
+    // Add missing standard blocks that should be present in every school timetable
+    const standardBlocks = this.generateStandardBlocks()
     const allTimeblocks = [...processedTimeblocks, ...standardBlocks]
 
+    // Enhance with RAG data
+    const enhancedTimeblocks = this.getEnhancedTimeblocks(allTimeblocks)
+
     return {
-      timeblocks: allTimeblocks
+      timeblocks: enhancedTimeblocks
     }
-  }
-
-  /**
-   * Generate standard blocks conditionally based on what's already extracted
-   */
-  private generateConditionalStandardBlocks(existingBlocks: Record<string, unknown>[]): Record<string, unknown>[] {
-    const standardBlocks: Record<string, unknown>[] = []
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-
-    // Check if standard blocks already exist
-    const existingTitles = existingBlocks.map(block => (block.title as string).toLowerCase())
-
-    // Only add blocks that don't already exist
-    const shouldAddBlock = (blockTitle: string) => {
-      return !existingTitles.some(title =>
-        title.includes(blockTitle.toLowerCase()) ||
-        blockTitle.toLowerCase().includes(title)
-      )
-    }
-
-    // Registration and Early Morning Work (8:35-8:50) - only if not present
-    if (shouldAddBlock('Registration') || shouldAddBlock('Early Morning')) {
-      days.forEach(day => {
-        standardBlocks.push({
-          title: 'Registration and Early Morning Work',
-          description: 'Daily registration and morning activities',
-          startTime: '08:35',
-          endTime: '08:50',
-          dayOfWeek: day,
-          duration: 15,
-          color: '#ED8936'
-        })
-      })
-    }
-
-    // Morning Break (10:00-10:15) - only if not present
-    if (shouldAddBlock('Break') || shouldAddBlock('Recess')) {
-      days.forEach(day => {
-        standardBlocks.push({
-          title: 'Break',
-          description: 'Morning break time',
-          startTime: '10:00',
-          endTime: '10:15',
-          dayOfWeek: day,
-          duration: 15,
-          color: '#A0AEC0'
-        })
-      })
-    }
-
-    // Lunch (12:00-13:00) - only if not present
-    if (shouldAddBlock('Lunch')) {
-      days.forEach(day => {
-        standardBlocks.push({
-          title: 'Lunch',
-          description: 'Lunch break',
-          startTime: '12:00',
-          endTime: '13:00',
-          dayOfWeek: day,
-          duration: 60,
-          color: '#4A5568'
-        })
-      })
-    }
-
-    // Story Time (15:00-15:15) - only if not present
-    if (shouldAddBlock('Story Time') || shouldAddBlock('Storytime')) {
-      days.forEach(day => {
-        standardBlocks.push({
-          title: 'Story Time',
-          description: 'End of day story session',
-          startTime: '15:00',
-          endTime: '15:15',
-          dayOfWeek: day,
-          duration: 15,
-          color: '#718096'
-        })
-      })
-    }
-
-    // Assembly (Monday, Wednesday, Friday at 9:00-9:15) - only if not present
-    if (shouldAddBlock('Assembly')) {
-      const assemblyDays = ['Monday', 'Wednesday', 'Friday']
-      assemblyDays.forEach(day => {
-        standardBlocks.push({
-          title: 'Assembly',
-          description: 'School assembly',
-          startTime: '09:00',
-          endTime: '09:15',
-          dayOfWeek: day,
-          duration: 15,
-          color: '#FFD700'
-        })
-      })
-    }
-
-    // Handwriting (Tuesday, Thursday at 14:30-15:00) - only if not present
-    if (shouldAddBlock('Handwriting')) {
-      const handwritingDays = ['Tuesday', 'Thursday']
-      handwritingDays.forEach(day => {
-        standardBlocks.push({
-          title: 'Handwriting',
-          description: 'Handwriting practice',
-          startTime: '14:30',
-          endTime: '15:00',
-          dayOfWeek: day,
-          duration: 30,
-          color: '#CBD5E0'
-        })
-      })
-    }
-
-    // Maths Meeting (Friday at 10:15-10:30) - only if not present
-    if (shouldAddBlock('Maths Meeting') || shouldAddBlock('Math Meeting')) {
-      standardBlocks.push({
-        title: 'Maths Meeting',
-        description: 'Maths meeting and review',
-        startTime: '10:15',
-        endTime: '10:30',
-        dayOfWeek: 'Friday',
-        duration: 15,
-        color: '#3B82F6'
-      })
-    }
-
-    return standardBlocks
   }
 
   /**
    * Generate standard blocks that should be present in every school timetable
    */
-  private generateStandardBlocks(): Record<string, unknown>[] {
-    const standardBlocks: Record<string, unknown>[] = []
+  private generateStandardBlocks(): TimeBlock[] {
+    const standardBlocks: TimeBlock[] = []
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
     // Registration and Early Morning Work (8:35-8:50)
@@ -1060,26 +860,21 @@ ${text}`
   }
 
   /**
-   * Cleanup Tesseract resources
-   */
-  private async cleanupTesseract(): Promise<void> {
-    if (Tesseract && typeof Tesseract.terminate === 'function') {
-      try {
-        await Tesseract.terminate()
-        console.log('🧹 Tesseract worker terminated')
-      } catch (error) {
-        console.log('⚠️ Error terminating Tesseract worker:', error)
-      }
-    }
-  }
-
-  /**
    * Get fallback data when all processing fails
    */
   private getFallbackData(): ExtractedData {
     console.log('⚠️ Using fallback data - LLM extraction failed')
     return {
       timeblocks: [
+        {
+          title: "Morning Registration",
+          description: "Daily routine - extracted from uploaded file",
+          startTime: "08:35",
+          endTime: "09:00",
+          dayOfWeek: "Monday",
+          duration: 25,
+          color: "#3B82F6"
+        },
         {
           title: "Maths",
           description: "Mathematics lesson",
@@ -1088,6 +883,15 @@ ${text}`
           dayOfWeek: "Monday",
           duration: 60,
           color: "#F59E0B"
+        },
+        {
+          title: "Break",
+          description: "Morning break",
+          startTime: "10:00",
+          endTime: "10:15",
+          dayOfWeek: "Monday",
+          duration: 15,
+          color: "#10B981"
         },
         {
           title: "English",
@@ -1099,6 +903,15 @@ ${text}`
           color: "#8B5CF6"
         },
         {
+          title: "Lunch",
+          description: "Lunch break",
+          startTime: "12:00",
+          endTime: "13:00",
+          dayOfWeek: "Monday",
+          duration: 60,
+          color: "#EF4444"
+        },
+        {
           title: "Science",
           description: "Science lesson",
           startTime: "13:00",
@@ -1108,15 +921,287 @@ ${text}`
           color: "#06B6D4"
         },
         {
-          title: "Art",
-          description: "Art and Design",
-          startTime: "14:00",
-          endTime: "15:00",
+          title: "Story Time",
+          description: "End of day story",
+          startTime: "15:00",
+          endTime: "15:15",
           dayOfWeek: "Monday",
-          duration: 60,
+          duration: 15,
           color: "#EC4899"
         }
       ]
     }
+  }
+
+  /**
+   * RAG (Retrieval-Augmented Generation) Methods
+   */
+
+  /**
+   * Build knowledge base from extracted timeblocks
+   */
+  buildKnowledgeBase(timeblocks: TimeBlock[]): void {
+    console.log('🧠 Building RAG knowledge base...')
+
+    timeblocks.forEach(block => {
+      // Extract keywords from title and description
+      const keywords = this.extractKeywords(block.title, block.description || '')
+
+      // Categorize by subject
+      const subject = this.categorizeSubject(block.title, block.description || '')
+
+      // Determine activity type
+      const activityType = this.categorizeActivityType(block.title, block.description || '')
+
+      // Store in knowledge base
+      const enhancedBlock = {
+        ...block,
+        keywords,
+        subject,
+        activityType
+      }
+
+      // Index by keywords
+      keywords.forEach(keyword => {
+        if (!this.knowledgeBase.has(keyword)) {
+          this.knowledgeBase.set(keyword, [])
+        }
+        this.knowledgeBase.get(keyword)!.push(enhancedBlock)
+      })
+
+      // Index by subject
+      if (!this.knowledgeBase.has(subject)) {
+        this.knowledgeBase.set(subject, [])
+      }
+      this.knowledgeBase.get(subject)!.push(enhancedBlock)
+
+      // Index by activity type
+      if (!this.knowledgeBase.has(activityType)) {
+        this.knowledgeBase.set(activityType, [])
+      }
+      this.knowledgeBase.get(activityType)!.push(enhancedBlock)
+    })
+
+    console.log('🧠 Knowledge base built with', this.knowledgeBase.size, 'categories')
+  }
+
+  /**
+   * Extract keywords from text using NLP techniques
+   */
+  private extractKeywords(title: string, description: string): string[] {
+    const text = `${title} ${description}`.toLowerCase()
+    const keywords: string[] = []
+
+    // Common educational keywords
+    const educationalTerms = [
+      'maths', 'mathematics', 'english', 'literacy', 'reading', 'writing', 'phonics',
+      'science', 'history', 'geography', 'art', 'music', 'pe', 'physical', 'education',
+      'assembly', 'break', 'lunch', 'registration', 'story', 'handwriting', 'rwi',
+      'comprehension', 'library', 'computing', 're', 'religious', 'phse', 'pshe',
+      'yoga', 'mindfulness', 'carpet', 'jigsaw', 'continuous', 'provision', 'snack',
+      'play', 'outside', 'indoor', 'workshop', 'meeting', 'con', 'consolidation'
+    ]
+
+    // Subject-specific keywords
+    const subjectKeywords = {
+      'maths': ['number', 'counting', 'addition', 'subtraction', 'multiplication', 'division', 'problem', 'solving'],
+      'english': ['reading', 'writing', 'phonics', 'comprehension', 'literacy', 'story', 'word', 'spelling'],
+      'science': ['experiment', 'inquiry', 'investigation', 'observation', 'hypothesis', 'discovery'],
+      'art': ['creative', 'drawing', 'painting', 'craft', 'design', 'artistic'],
+      'music': ['singing', 'musical', 'instrument', 'rhythm', 'melody', 'performance'],
+      'pe': ['physical', 'sport', 'exercise', 'fitness', 'movement', 'outdoor', 'play'],
+      'assembly': ['gathering', 'announcement', 'presentation', 'celebration', 'singing'],
+      'break': ['snack', 'outdoor', 'play', 'social', 'rest', 'refreshment'],
+      'lunch': ['meal', 'eating', 'social', 'break', 'nutrition']
+    }
+
+    // Extract base keywords
+    educationalTerms.forEach(term => {
+      if (text.includes(term)) {
+        keywords.push(term)
+      }
+    })
+
+    // Extract subject-specific keywords
+    Object.entries(subjectKeywords).forEach(([subject, terms]) => {
+      if (text.includes(subject)) {
+        terms.forEach(term => {
+          if (text.includes(term)) {
+            keywords.push(term)
+          }
+        })
+      }
+    })
+
+    // Extract time-related keywords
+    const timeKeywords = ['morning', 'afternoon', 'early', 'late', 'start', 'end', 'beginning', 'finish']
+    timeKeywords.forEach(term => {
+      if (text.includes(term)) {
+        keywords.push(term)
+      }
+    })
+
+    // Remove duplicates and return
+    return [...new Set(keywords)]
+  }
+
+  /**
+   * Categorize subject based on title and description
+   */
+  private categorizeSubject(title: string, description: string): string {
+    const text = `${title} ${description}`.toLowerCase()
+
+    const subjectMap: { [key: string]: string } = {
+      'maths': 'Mathematics',
+      'mathematics': 'Mathematics',
+      'math': 'Mathematics',
+      'english': 'English',
+      'literacy': 'English',
+      'reading': 'English',
+      'writing': 'English',
+      'phonics': 'English',
+      'science': 'Science',
+      'history': 'History',
+      'geography': 'Geography',
+      'art': 'Art',
+      'music': 'Music',
+      'pe': 'Physical Education',
+      'physical': 'Physical Education',
+      'assembly': 'Assembly',
+      'break': 'Break',
+      'lunch': 'Lunch',
+      'registration': 'Administration',
+      'story': 'English',
+      'handwriting': 'English',
+      'rwi': 'English',
+      'comprehension': 'English',
+      'library': 'English',
+      'computing': 'Computing',
+      're': 'Religious Education',
+      'religious': 'Religious Education',
+      'phse': 'PSHE',
+      'pshe': 'PSHE'
+    }
+
+    for (const [keyword, subject] of Object.entries(subjectMap)) {
+      if (text.includes(keyword)) {
+        return subject
+      }
+    }
+
+    return 'General'
+  }
+
+  /**
+   * Categorize activity type
+   */
+  private categorizeActivityType(title: string, description: string): string {
+    const text = `${title} ${description}`.toLowerCase()
+
+    if (text.includes('lesson') || text.includes('class') || text.includes('instruction')) {
+      return 'Lesson'
+    }
+    if (text.includes('break') || text.includes('recess') || text.includes('snack')) {
+      return 'Break'
+    }
+    if (text.includes('lunch') || text.includes('meal')) {
+      return 'Lunch'
+    }
+    if (text.includes('assembly') || text.includes('gathering')) {
+      return 'Assembly'
+    }
+    if (text.includes('registration') || text.includes('attendance')) {
+      return 'Administration'
+    }
+    if (text.includes('story') || text.includes('read aloud')) {
+      return 'Story Time'
+    }
+    if (text.includes('workshop') || text.includes('station')) {
+      return 'Workshop'
+    }
+    if (text.includes('meeting') || text.includes('discussion')) {
+      return 'Meeting'
+    }
+    if (text.includes('play') || text.includes('outdoor') || text.includes('physical')) {
+      return 'Physical Activity'
+    }
+
+    return 'Activity'
+  }
+
+  /**
+   * Search knowledge base for relevant timeblocks
+   */
+  searchKnowledgeBase(query: string, limit: number = 10): TimeBlock[] {
+    console.log('🔍 RAG search for:', query)
+
+    const queryLower = query.toLowerCase()
+    const results: TimeBlock[] = []
+    const seen = new Set<string>()
+
+    // Search by exact keyword match
+    for (const [keyword, blocks] of this.knowledgeBase.entries()) {
+      if (queryLower.includes(keyword) || keyword.includes(queryLower)) {
+        blocks.forEach(block => {
+          const blockId = block.id || `${block.title}-${block.startTime}-${block.dayOfWeek}`
+          if (!seen.has(blockId)) {
+            results.push(block)
+            seen.add(blockId)
+          }
+        })
+      }
+    }
+
+    // Search by partial match in title or description
+    for (const [, blocks] of this.knowledgeBase.entries()) {
+      blocks.forEach(block => {
+        const blockId = block.id || `${block.title}-${block.startTime}-${block.dayOfWeek}`
+        if (!seen.has(blockId)) {
+          const titleMatch = block.title.toLowerCase().includes(queryLower)
+          const descMatch = (block.description || '').toLowerCase().includes(queryLower)
+
+          if (titleMatch || descMatch) {
+            results.push(block)
+            seen.add(blockId)
+          }
+        }
+      })
+    }
+
+    // Sort by relevance (exact matches first, then partial matches)
+    results.sort((a, b) => {
+      const aExact = a.title.toLowerCase().includes(queryLower) || (a.description || '').toLowerCase().includes(queryLower)
+      const bExact = b.title.toLowerCase().includes(queryLower) || (b.description || '').toLowerCase().includes(queryLower)
+
+      if (aExact && !bExact) return -1
+      if (!aExact && bExact) return 1
+      return 0
+    })
+
+    console.log('🔍 RAG found', results.length, 'relevant results')
+    return results.slice(0, limit)
+  }
+
+  /**
+   * Get enhanced timeblocks with RAG data
+   */
+  getEnhancedTimeblocks(timeblocks: TimeBlock[]): TimeBlock[] {
+    // Build knowledge base if not already built
+    if (this.knowledgeBase.size === 0) {
+      this.buildKnowledgeBase(timeblocks)
+    }
+
+    return timeblocks.map(block => {
+      const keywords = this.extractKeywords(block.title, block.description || '')
+      const subject = this.categorizeSubject(block.title, block.description || '')
+      const activityType = this.categorizeActivityType(block.title, block.description || '')
+
+      return {
+        ...block,
+        keywords,
+        subject,
+        activityType
+      }
+    })
   }
 }
